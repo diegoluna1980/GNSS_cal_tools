@@ -11,13 +11,14 @@ import datetime
 import numpy as np
 from GNSS_cal_tools_subs import OExyz, dfSTAgen, dfNAVgen, C1P1, outputs
 from GNSS_cal_tools_subs import ElevationReject, DIFgen, figures, loader
+from GNSS_cal_tools_subs import calibration
 
 inicio = time.time()
 
 # Limitations:
 # Only one RINEX file per station
 # No LZ files (the case when the two receivers don't have the same reference)
-
+# Tested only for GPS
 
 
 # Version
@@ -39,13 +40,32 @@ config = {
 }
 
 # RINEX OBS and NAV files
-file_a = 'SIMr2350.24O'  # Usually the travelling station
-file_b = 'AGGO2350.24O'
+file_a = 'AGGO2350.24O'
+file_b = 'SIMr2350.24O'  # The station that will be calibrated
 file_nav = 'BRDC00IGS_R_20242350000_01D_MN.rnx'
 
 # Positions extracted from NRCan PPP solutions
-pos1 = np.array([2765129.907, -4449245.382, -3626402.075])
-pos2 = np.array([2765121.467, -4449250.973, -3626403.769])
+pos_a = np.array([2765121.467, -4449250.973, -3626403.769])
+pos_b = np.array([2765129.907, -4449245.382, -3626402.075])
+
+# Delays in receivers
+
+delays_a = {
+    'INTdlyC1': 31.9,
+    'INTdlyP1': 30.1,
+    'INTdlyP2': 028.3,    
+    'CABdly': 207.9,
+    'REFdly': 12.3,
+    }
+
+delays_b = {
+    'INTdlyC1': np.nan,  # Leave NaN. Will be calculated
+    'INTdlyP1': np.nan,  # Leave NaN. Will be calculated
+    'INTdlyP2': np.nan,  # Leave NaN. Will be calculated
+    'CABdly': 328.3,
+    'REFdly': 13.7,
+    }
+
 
 # =============================================================================
 # End of inputs
@@ -76,7 +96,7 @@ df_sta2 = dfSTAgen(sta2)
 dfnav = dfNAVgen(nav)
 
 # Positions, distance and interval
-x = pos2-pos1
+x = pos_b-pos_a
 dist = np.linalg.norm(x)
 
 # Create a reduced dataframe of ephemeris, with only one entry per sat, per day
@@ -89,18 +109,22 @@ df_sta1 = OExyz(dfnav_first, df_sta1)
 df_sta2 = OExyz(dfnav_first, df_sta2)
 
 # Rejection at low elevation (line 1554 of dclrinex)
-df_sta1 = ElevationReject(df_sta1, pos1, config, sta1.filename)
-df_sta2 = ElevationReject(df_sta2, pos2, config, sta2.filename)
+df_sta1 = ElevationReject(df_sta1, pos_a, config, sta1.filename)
+df_sta2 = ElevationReject(df_sta2, pos_b, config, sta2.filename)
 
 # Add C1P1 bias
 sta1 = C1P1(sta1,df_sta1)
 sta2 = C1P1(sta2,df_sta2)
 
 # Genero diferencias
-dif = DIFgen(df_sta1, df_sta2, config, pos1, pos2)
+dif = DIFgen(df_sta1, df_sta2, config, pos_a, pos_b)
 
-# Text Outputs
-outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif)
+# Text Outputs and rawdif calculation. rawdiff = a - b
+rawdiff = outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif)
+
+# Results of calibration (optional)
+delays_b = calibration(rawdiff, delays_a, delays_b)
+
 
 # Figure Outputs
 figures(dif, config, ts)

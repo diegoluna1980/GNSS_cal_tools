@@ -27,6 +27,20 @@ MU = 3.9860050e14
 # OMEGAE - WGS84 value of the Earth's rotation rate in rad/sec
 OMEGAE = 7.292115e-5
 
+def calibration(rawdiff, delays_a, delays_b):
+    deltaCABdly = delays_a['CABdly'] - delays_b['CABdly']
+    deltaREFdly = delays_a['REFdly'] - delays_b['REFdly']
+    
+    deltaINTdlyC1 = rawdiff['medianC1'] - deltaCABdly + deltaREFdly 
+    deltaINTdlyP1 = rawdiff['medianP1'] - deltaCABdly + deltaREFdly 
+    deltaINTdlyP2 = rawdiff['medianP2'] - deltaCABdly + deltaREFdly 
+    
+    delays_b['INTdlyC1'] = delays_a['INTdlyC1'] - deltaINTdlyC1 
+    delays_b['INTdlyP1'] = delays_a['INTdlyP1'] - deltaINTdlyP1
+    delays_b['INTdlyP2'] = delays_a['INTdlyP2'] - deltaINTdlyP2
+    
+    return(delays_b)
+
 def loader(file,config):
     """
     Reads a RINEX file (version 2 or 3) and returns the dataset.
@@ -94,7 +108,7 @@ def figures(dif,config,ts):
         
         plt.subplot(231)
         plt.plot(MJD, C1, 'b.',markeredgewidth=0.0,zorder=4,label='C1')
-        plt.title('Median: (' + str(round(np.median(C1),1)) + '+/-' + str(round(C1.std(),1)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(C1),1)) + '+/-' + str(round(C1.std(),2)) + ') ns')
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.ylabel('Time / ns', size = 14)
         plt.xlabel('MJD', size = 14)
@@ -110,7 +124,7 @@ def figures(dif,config,ts):
         
         plt.subplot(232)
         plt.plot(MJD, P1, 'b.',markeredgewidth=0.0,zorder=4,label='P1')
-        plt.title('Median: (' + str(round(np.median(P1),1)) + '+/-' + str(round(P1.std(),1)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(P1),1)) + '+/-' + str(round(P1.std(),2)) + ') ns')
         plt.xlabel('MJD', size = 14)
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.grid(linestyle='dashed')
@@ -124,7 +138,7 @@ def figures(dif,config,ts):
         
         plt.subplot(233)
         plt.plot(MJD, P2, 'b.',markeredgewidth=0.0,zorder=4,label='P2')
-        plt.title('Median: (' + str(round(np.median(P2),1)) + '+/-' + str(round(P2.std(),1)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(P2),1)) + '+/-' + str(round(P2.std(),2)) + ') ns')
         plt.xlabel('MJD', size = 14)
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.grid(linestyle='dashed')
@@ -297,6 +311,7 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
     dif['P1_corr'] = (dif['P1'].to_numpy() - corg1)
     dif['P2_corr'] = (dif['P2'].to_numpy() - corg1)
     
+
     return(dif)
     
 def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
@@ -304,29 +319,33 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     # Open file
     filename = sta1.filename.partition(".")[0] + sta2.filename.partition(".")[0]
     file_sum = open(filename + '_results.txt', 'w')
-    file_sum.write(' SIM_GNSS_cal Version: ' + VERSION + '\n')
-    file_sum.write('Processing date and time: ' + st +' UTC-3\n')
-    file_sum.write('Output interval (s) = ' + str(config['intcod']) + '\n')
-    file_sum.write('Code threshold (ns) = ' + str(config['ithr']) + '\n')
-    file_sum.write('Residual threshold (m) = ' + str(config['thres']) + '\n')
-    file_sum.write('Processed system: ' + config['SYS'] + '. (GPS:G, Galileo:R, Glonass:R, Beidu:C)\n') 
     
-    file_sum.write('Min Elevation (deg): ' + str(config['elmin']) + '\n\n') 
-    file_sum.write('INPUT FILES' + '\n')    
-    file_sum.write(' ' + file_nav + '\t')
-    file_sum.write('RINEX version: ' + str(nav.version) + '\n')    
-    file_sum.write(' ' + sta1.filename + '\t')
-    file_sum.write('RINEX version: ' + str(sta1.version) + '\n') 
-    file_sum.write(' ' + sta2.filename + '\t')
-    file_sum.write('RINEX version: ' + str(sta2.version) + '\n\n') 
+    file_sum.write(
+    f" SIM_GNSS_cal Version: {VERSION}\n"
+    f"Processing date and time: {st} UTC-3\n"
+    f"Output interval (s) = {config['intcod']}\n"
+    f"Code threshold (ns) = {config['ithr']}\n"
+    f"Residual threshold (m) = {config['thres']}\n"
+    f"Processed system: {config['SYS']}. (GPS:G, Galileo:R, Glonass:R, Beidu:C)\n"
+    f"Min Elevation (deg): {config['elmin']}\n\n"
+    f"INPUT FILES\n"
+    f" {file_nav}\tRINEX version: {nav.version}\n"
+    f" {sta1.filename}\tRINEX version: {sta1.version}\n"
+    f" {sta2.filename}\tRINEX version: {sta2.version}\n\n"
+    )
 
-    file_sum.write(f'Distance from headers is {dist:.2f} m\n')
-    file_sum.write(f'Interval of {sta1.filename} is {sta1.interval} s\n')
-    file_sum.write(f'Interval of {sta2.filename} is {sta2.interval} s\n\n')
 
-    print(f'Distance read from headers is: {dist:.2f} m')
-    print(f'Interval of file1 is {sta1.interval} s')
-    print(f'Interval of file2 is {sta2.interval} s')
+    file_sum.write(
+    f"Distance from headers is {dist:.2f} m\n"
+    f"Interval of {sta1.filename} is {sta1.interval} s\n"
+    f"Interval of {sta2.filename} is {sta2.interval} s\n\n"
+    )
+
+    print(
+        f"Distance read from headers is: {dist:.2f} m\n"
+        f"Interval of file1 is {sta1.interval} s\n"
+        f"Interval of file2 is {sta2.interval} s"
+    )
 
 
     if dist > 1000:
@@ -338,47 +357,62 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         print('Not the same data interval')
     
     
-    file_sum.write('Median and stdev of C1P1 bias in ' + sta1.filename + ': (' + 
-          str(round(sta1['c1p1_bias_median'].values/0.299792458,2)) + ' +/- ' 
-          + str(round(sta1['c1p1_bias_std'].values/0.299792458,2)) + ') ns\n')
+    file_sum.write(
+        f"Median and stdev of C1P1 bias in {sta1.filename}: "
+        f"({round(sta1['c1p1_bias_median'].values / 0.299792458, 2)} +/- "
+        f"{round(sta1['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
     
-    print('Median and stdev of C1P1 bias in ' + sta1.filename + ': (' + 
-          str(round(sta1['c1p1_bias_median'].values/0.299792458,2)) + ' +/- ' 
-          + str(round(sta1['c1p1_bias_std'].values/0.299792458,2)) + ') ns\n')  
-    
-    file_sum.write('Median and stdev of C1P1 bias in ' + sta2.filename + ': (' + 
-          str(round(sta2['c1p1_bias_median'].values/0.299792458,2)) + ' +/- ' 
-          + str(round(sta2['c1p1_bias_std'].values/0.299792458,2)) +  ') ns\n\n')
-    
-    print('Median and stdev of C1P1 bias in ' + sta1.filename + ': (' + 
-          str(round(sta2['c1p1_bias_median'].values/0.299792458,2)) + ' +/- ' 
-          + str(round(sta2['c1p1_bias_std'].values/0.299792458,2)) + ') ns\n')  
+        f"Median and stdev of C1P1 bias in {sta2.filename}: "
+        f"({round(sta2['c1p1_bias_median'].values / 0.299792458, 2)} +/- "
+        f"{round(sta2['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n\n"
+    )
 
-    file_sum.write('Median and stdev of C1 difference: (' +
-          str(round(dif['C1_corr'].median()/0.299792458, 1)) + ' +/- '
-          + str(round(dif['C1_corr'].std()/0.299792458, 0)) + ') ns\n')
+    print(
+        f"Median and stdev of C1P1 bias in {sta1.filename}: "
+        f"({round(sta1['c1p1_bias_median'].values / 0.299792458, 2)} +/- "
+        f"{round(sta1['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
+        
+        f"Median and stdev of C1P1 bias in {sta2.filename}: "
+        f"({round(sta2['c1p1_bias_median'].values / 0.299792458, 2)} +/- "
+        f"{round(sta2['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
+    )
 
-    file_sum.write('Median and stdev of P1 difference: (' +
-          str(round(dif['P1_corr'].median()/0.299792458, 1)) + ' +/- '
-          + str(round(dif['P1_corr'].std()/0.299792458, 0)) + ') ns\n')
+    rawdiff = {
+        'medianC1' : round(dif['C1_corr'].median()/0.299792458, 2),
+        'stdC1' : round(dif['C1_corr'].std()/0.299792458, 1),
+        'medianP1' : round(dif['P1_corr'].median()/0.299792458, 2),
+        'stdP1' : round(dif['P1_corr'].std()/0.299792458, 1),
+        'medianP2' : round(dif['P2_corr'].median()/0.299792458, 2),
+        'stdP2' : round(dif['P2_corr'].std()/0.299792458, 1)
+        }
 
-    file_sum.write('Median and stdev of P2 difference: (' +
-          str(round(dif['P2_corr'].median()/0.299792458, 1)) + ' +/- '
-          + str(round(dif['P2_corr'].std()/0.299792458, 0)) + ') ns\n')
 
-    print('Median and stdev of C1 difference: (' +
-          str(round(dif['C1_corr'].median()/0.299792458, 1)) + ' +/- '
-          + str(round(dif['C1_corr'].std()/0.299792458, 0)) + ') ns\n')
+    file_sum.write(
+    f"Median and stdev of C1 difference: ({rawdiff['medianC1']} +/- {rawdiff['stdC1']}) ns\n"
+    f"Median and stdev of P1 difference: ({rawdiff['medianP1']} +/- {rawdiff['stdP1']}) ns\n"
+    f"Median and stdev of P2 difference: ({rawdiff['medianP2']} +/- {rawdiff['stdP2']}) ns\n"
+    )
 
-    print('Median and stdev of P1 difference: (' +
-          str(round(dif['P1_corr'].median()/0.299792458, 1)) + ' +/- '
-          + str(round(dif['P1_corr'].std()/0.299792458, 0)) + ') ns\n')
+    print(
+        f"Median and stdev of C1 difference: ({rawdiff['medianC1']} +/- {rawdiff['stdC1']}) ns\n"
+        f"Median and stdev of P1 difference: ({rawdiff['medianP1']} +/- {rawdiff['stdP1']}) ns\n"
+        f"Mean and stdev of P2 difference:   ({rawdiff['medianP2']} +/- {rawdiff['stdP2']}) ns\n"
+    )
 
-    print('Mean and stdev of P2 difference: (' +
-          str(round(dif['P2_corr'].median()/0.299792458, 1)) + ' +/- '
-          + str(round(dif['P2_corr'].std()/0.299792458, 0)) + ') ns\n')
     
     file_sum.close()
+
+
+    cols_a_exportar = dif[['MJD','sv', 'C1_corr', 'P1_corr', 'P2_corr']].copy()
+    cols_a_exportar.columns = ['MJD', 'sv', 'C1', 'P1', 'P2']
+    cols_a_exportar['MJD'] = cols_a_exportar['MJD'].map(lambda x: f"{x:.5f}")
+    cols_a_exportar['C1']  = cols_a_exportar['C1'].map(lambda x: f"{x:.2f}")
+    cols_a_exportar['P1']  = cols_a_exportar['P1'].map(lambda x: f"{x:.2f}")
+    cols_a_exportar['P2']  = cols_a_exportar['P2'].map(lambda x: f"{x:.2f}")
+    cols_a_exportar.to_csv( filename + '_measurements.txt', sep='\t', index=False)
+    
+
+    return(rawdiff)
 
 def ElevationReject(dfSTA,pos,config,name):
     
@@ -441,13 +475,10 @@ def ElevationReject(dfSTA,pos,config,name):
         plt.show()    
     return(dfSTA)
 
-
 def C1P1(sta,df_sta):
     sta['c1p1_bias_median'] = (df_sta['C1'] - df_sta['P1']).median()
     sta['c1p1_bias_std'] = (df_sta['C1'] - df_sta['P1']).std()    
-
     return(sta)
-
 
 def OExyz(dfnav_first,dfSTA):
     
