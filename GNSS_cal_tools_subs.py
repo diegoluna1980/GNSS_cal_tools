@@ -28,13 +28,39 @@ MU = 3.9860050e14
 OMEGAE = 7.292115e-5
 
 def calibration(rawdiff, delays_a, delays_b):
-    deltaCABdly = delays_a['CABdly'] - delays_b['CABdly']
-    deltaREFdly = delays_a['REFdly'] - delays_b['REFdly']
     
+    """
+    Adjusts the internal delays (INTdly) of device B based on the difference 
+    between device A and B's cable delays (CABdly) and reference delays (REFdly),
+    as well as raw timing differences (rawdiff).
+    
+    Args:
+        rawdiff (dict): Contains median timing differences between devices A and B
+                        for channels C1, P1, and P2 (keys: 'medianC1', 'medianP1', 'medianP2').
+        delays_a (dict): Delay values for device A, including:
+                        - CABdly: Cable delay
+                        - REFdly: Reference delay
+                        - INTdlyC1/INTdlyP1/INTdlyP2: Internal delays for different channels
+        delays_b (dict): Delay values for device B (same structure as delays_a) that will be updated
+    
+    Returns:
+        dict: The updated delays_b dictionary with adjusted INTdly values for channels C1, P1, and P2.
+    """
+    
+    # Calculate the difference in cable delays (CABdly) between device A and B  
+    deltaCABdly = delays_a['CABdly'] - delays_b['CABdly']
+
+    # Calculate the difference in reference delays (REFdly) between device A and B    
+    deltaREFdly = delays_a['REFdly'] - delays_b['REFdly']
+
+    # Calculate the internal delay differences for each channel by adjusting the raw differences
+    # with the cable and reference delay differences    
     deltaINTdlyC1 = rawdiff['medianC1'] - deltaCABdly + deltaREFdly 
     deltaINTdlyP1 = rawdiff['medianP1'] - deltaCABdly + deltaREFdly 
     deltaINTdlyP2 = rawdiff['medianP2'] - deltaCABdly + deltaREFdly 
     
+    # Update device B's internal delays by subtracting the calculated differences
+    # from device A's internal delays    
     delays_b['INTdlyC1'] = delays_a['INTdlyC1'] - deltaINTdlyC1 
     delays_b['INTdlyP1'] = delays_a['INTdlyP1'] - deltaINTdlyP1
     delays_b['INTdlyP2'] = delays_a['INTdlyP2'] - deltaINTdlyP2
@@ -77,35 +103,46 @@ def loader(file,config):
 
 def figures(dif,config,ts):
     
+    """
+    Generates plots of time series and time deviations (TDEV) 
+    for C1, P1, and P2 GNSS code corrections, and saves them to a PDF.
+
+    Parameters:
+    - dif: DataFrame containing corrected GNSS code data with MJD index.
+    - config: dict with configuration options 
+    - ts: Unix timestamp indicating when the computation was performed.
+    """
+    
+    
     if config['timeplots']:
 
-        # Paso los valores de km a ns:
+        # Conversion factor from kilometers to nanoseconds
         k = 0.299792458
         
-        # Extraigo cada una de las fechas distintas que aparecen en el MJD
+        # List of unique Modified Julian Dates (MJD)
         MJD = dif.MJD.unique()
         
-        # Tomo la mediana de cada una de las MJD únicas
+        # Group data by MJD and compute median values
         pop1 = dif.groupby(['MJD']).median()
         
-        #MJD = pop.to_numpy()
+        # Convert median corrected values from km to ns
         C1 = pop1['C1_corr'].to_numpy() / k
         P1 = pop1['P1_corr'].to_numpy() / k
         P2 = pop1['P2_corr'].to_numpy() / k
                
-        # Time deviations
+        # Compute Time Deviation (TDEV) using allantools for each observable
         (C1_tau_tdev, C1_tdev, C1_tdeverr, n_tdev) = allantools.tdev(C1, rate= 1/config['intcod'], data_type="phase", taus='octave')
         (P1_tau_tdev, P1_tdev, P1_tdeverr, n_tdev) = allantools.tdev(P1, rate= 1/config['intcod'], data_type="phase", taus='octave')
         (P2_tau_tdev, P2_tdev, P2_tdeverr, n_tdev) = allantools.tdev(P2, rate= 1/config['intcod'], data_type="phase", taus='octave')
         
-        #==============================================================================
-        # Figura 1    
-        #==============================================================================
-        
+        # Create figure and layout        
         fig1 = plt.figure(1,figsize=(12,8))
         plt.subplots_adjust(hspace = .3)
+        
+        # Add timestamp to right margin
         plt.figtext(0.95, 0.5,  'Computed at: ' + datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S') + ' UTC-3\n', rotation=90)
         
+        # Plot time series for C1        
         plt.subplot(231)
         plt.plot(MJD, C1, 'b.',markeredgewidth=0.0,zorder=4,label='C1')
         plt.title('Median: (' + str(round(np.median(C1),1)) + '+/-' + str(round(C1.std(),2)) + ') ns')
@@ -121,7 +158,7 @@ def figures(dif,config,ts):
         plt.xticks(xx, ll)
         plt.tick_params(direction="in")
 
-        
+        # Plot time series for P1
         plt.subplot(232)
         plt.plot(MJD, P1, 'b.',markeredgewidth=0.0,zorder=4,label='P1')
         plt.title('Median: (' + str(round(np.median(P1),1)) + '+/-' + str(round(P1.std(),2)) + ') ns')
@@ -136,6 +173,7 @@ def figures(dif,config,ts):
         plt.xticks(xx, ll)
         plt.tick_params(direction="in")
         
+        # Plot time series for P2
         plt.subplot(233)
         plt.plot(MJD, P2, 'b.',markeredgewidth=0.0,zorder=4,label='P2')
         plt.title('Median: (' + str(round(np.median(P2),1)) + '+/-' + str(round(P2.std(),2)) + ') ns')
@@ -150,11 +188,10 @@ def figures(dif,config,ts):
         plt.xticks(xx, ll)
         plt.tick_params(direction="in")
         
+        # Plot TDEV for C1
         plt.subplot(234)
         plt.loglog(C1_tau_tdev, C1_tdev, '-ko',markeredgewidth=0.0,zorder=4)
         plt.axhline(y=0.1, color='r', linestyle='--')  # Red dashed line at y=5
-        #plt.title('C1_alllan')
-        #plt.legend()
         plt.ylabel('Time deviation / ns', size = 14)
         plt.xlabel('Time / s', size = 14)
         plt.yticks(size=12)
@@ -162,6 +199,7 @@ def figures(dif,config,ts):
         plt.grid(linestyle='dashed')
         plt.tick_params(direction="in")
         
+        # Plot TDEV for P1
         plt.subplot(235)
         plt.loglog(P1_tau_tdev, P1_tdev, '-ko',markeredgewidth=0.0,zorder=4)
         plt.axhline(y=0.1, color='r', linestyle='--')  # Red dashed line at y=5
@@ -172,6 +210,7 @@ def figures(dif,config,ts):
         plt.grid(linestyle='dashed')
         plt.tick_params(direction="in")
         
+        # Plot TDEV for P2
         plt.subplot(236)
         plt.loglog(P2_tau_tdev, P2_tdev, '-ko',markeredgewidth=0.0,zorder=4)
         plt.axhline(y=0.1, color='r', linestyle='--')  # Red dashed line at y=5
@@ -182,23 +221,67 @@ def figures(dif,config,ts):
         plt.grid(linestyle='dashed')
         plt.tick_params(direction="in")
         
-        plt.suptitle('C1, P1, and P2 plots. GNSS_cal_tools.py', fontsize=16,  fontweight='bold')
+        # Global title and save
+        plt.suptitle('C1, P1, and P2 plots - GNSS_cal_tools.py', fontsize=16,  fontweight='bold')
         destino = 'C1P1P2plotsGNSS_cal_tools.pdf'
         fig1.savefig(destino,facecolor='0.9', dpi = 200)
         plt.close()
 
 
 def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
+
+    """
+    Generate differential GNSS observations between two stations.
+
+    This function computes epoch-wise differences between pseudorange observations 
+    (C1, P1, P2) from two stations, aligned by time and satellite. It applies filters 
+    to remove outliers and corrects the differences based on the geometric projection 
+    of the baseline between the stations onto the satellite directions.
+
+    Parameters:
+    -----------
+    dfSTA1 : pd.DataFrame
+        DataFrame for station 1. Must contain columns:
+        ['MJD', 'sv', 'C1', 'P1', 'P2', 'X', 'Y', 'Z', 'elevation']
+
+    dfSTA2 : pd.DataFrame
+        DataFrame for station 2. Must contain columns:
+        ['MJD', 'sv', 'C1', 'P1', 'P2']
+
+    config : dict
+        Configuration dictionary containing:
+        - 'intcod': integration time in seconds (typically 300)
+
+    pos1 : array-like of float
+        coordinates [X, Y, Z] of station 1
+
+    pos2 : array-like of float
+        coordinates [X, Y, Z] of station 2
+
+    Returns:
+    --------
+    dif : pd.DataFrame
+        DataFrame of differential measurements and metadata with columns:
+        ['MJD', 'sv', 'X', 'Y', 'Z', 'elevation', 
+         'C1', 'P1', 'P2', 'P1-P2', 
+         'C1_corr', 'P1_corr', 'P2_corr']
+    """
+
+    # Convert integration time from seconds to days
     codint = config['intcod']/86400  
     dat1 = pd.DataFrame()
     dat2 = pd.DataFrame()
     
-    # Genero una columna con fechas separadas segun el valor intcod (300 s, generalmente)
+    # Generate time vector from min to max MJD, spaced by integration time
+    # (usually 300 s, the value of intcod)
     dat1['MJD'] = np.arange(np.floor(dfSTA1['MJD'].min()), np.ceil(dfSTA1['MJD'].max()) + codint, codint)
     
+    # Get all unique satellites
     # A las columnas con las fechas, le agrego una entrada por cada satelite
     arr = dfSTA1['sv'].unique()
     df_arr = pd.DataFrame({'sv': arr})
+    
+    # Cross join: each time instant x each satellite
     dat1 = dat1.merge(df_arr,how='cross')
     
     # Copio al dat2
@@ -215,7 +298,7 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
     Z_vals = []
     ele_vals = []
     
-    # Recorremos con .itertuples()
+    # Fill dat1 with median values within each time window
     for row in dat1.itertuples(index=False):
          sat = row.sv
          mjd = row.MJD
@@ -229,7 +312,7 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
          Z_vals.append(subset['Z'].median())
          ele_vals.append(subset['elevation'].median())
     
-    # Asignar las columnas
+    # Assign aggregated values to dat1
     dat1['C1'] = C1_vals
     dat1['P1'] = P1_vals
     dat1['P2'] = P2_vals
@@ -238,13 +321,13 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
     dat1['Z'] = Z_vals
     dat1['elevation'] = ele_vals
     
-    # # Precompilar valores para asignar
+    # Repeat for second station (no satellite positions needed)
     dat2[['C1', 'P1', 'P2']] = np.nan
     C1_vals = []
     P1_vals = []
     P2_vals = []
     
-    # # Recorremos con .itertuples()
+    
     for row in dat2.itertuples(index=False):
         sat = row.sv
         mjd = row.MJD
@@ -259,7 +342,7 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
     dat2['P1'] = P1_vals
     dat2['P2'] = P2_vals
     
-    # Genero dataframe de difreencias
+    # Compute differences between stations
     dif = pd.DataFrame()    
     #dif = dat1[['MJD', 'sv']].copy()
     dif = dat1[['MJD', 'sv', 'X', 'Y','Z','elevation']].copy()
@@ -270,16 +353,18 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
     dif['P2'] = dat1['P2'] - dat2['P2']
     dif['P1-P2'] = dif['P1'] - dif['P2']
     
-    # Filtro de outliers (|valor| <= 300).  (Line 1588 dclrinex)
+    # Filter out large outliers (absolute value <= 300 ns)(Line 1588 dclrinex)
     dif = dif[(dif[['C1', 'P1', 'P2']].abs() <= 300).all(axis=1)]
     
-    # Otro filtro (Line 1592 dclrinex) (not really necessary in this case)
+    # Additional filter on ionospheric observable P1-P2 (<= 30 ns)
+    # (Line 1592 dclrinex) (not really necessary in this case)
     dif = dif[(dif[['P1-P2']].abs() <= 30).all(axis=1)]
 
-    #==============================================================================
-    # Filtro MAD 
-    #==============================================================================
-    u = 3 #Umbral de rechazo
+    #------------------------------------------------------------------------------
+    # Apply Median Absolute Deviation (MAD) filter for C1, P1, and P2
+    #------------------------------------------------------------------------------
+
+    u = 3 # Threshold for MAD filtering (u * sigma)
     Xc = dif['C1'].median()
     S=1.4826*np.median(np.abs(dif['C1']-Xc))
     dif['C1-Xc'] = dif['C1']-Xc
@@ -299,14 +384,22 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
     dif.drop(columns='P1-Xc', inplace=True)
     dif.drop(columns='P2-Xc', inplace=True)
 
+    #------------------------------------------------------------------------------
+    # Geometry-based correction (project baseline onto satellite direction)
+    #------------------------------------------------------------------------------
+
     x = pos2-pos1
 
     xsta, ysta, zsta = pos1
     xsat =  dif['X'].to_numpy() - xsta
     ysat =  dif['Y'].to_numpy() - ysta
     zsat =  dif['Z'].to_numpy() - zsta
-    r = np.sqrt(xsat**2+ysat**2+zsat**2) # 1664
+    r = np.sqrt(xsat**2+ysat**2+zsat**2) # 1664 in dclrinex
+    
+    # Projection of baseline onto satellite line-of-sight    
     corg1 = (x[0]*xsat + x[1]*ysat + x[2]*zsat)/r
+    
+    # Apply correction to measurements
     dif['C1_corr'] = (dif['C1'].to_numpy() - corg1)
     dif['P1_corr'] = (dif['P1'].to_numpy() - corg1)
     dif['P2_corr'] = (dif['P2'].to_numpy() - corg1)

@@ -1,0 +1,133 @@
+  DCLRINEX Version 27/08/2021
+ Outfiles = SIMrAGGO24235_1     
+ Output interval (s) =  300
+ Code threshold (ns) =   20
+ Residual threshold (m) =0.050
+ Process all GNSS
+ Process only CGGTTS codes
+ No process BDS GEO satellites
+ Process BDS2 satellites
+ Process BDS3 satellites
+ Min Elevation (deg):   5
+
+INPUT FILES
+ BRDC00IGS_R_20242350000_01D_MN.rnx    
+ Rinex version   3.04
+ SIMr2350.24O                          
+ Rinex version   3.04
+ AGGO2350.24O                          
+ Rinex version   3.05
+
+ Minimum elevation =   5 deg
+ Number of obs removed =   4337
+ Number of obs retained =  88572
+
+
+ C1-P1 bias SIMr      AVE RMS /ns =      1.889     1.137
+ C1-P1 bias AGGO      AVE RMS /ns =      1.593     1.103
+
+ COMPUTATION OF BASELINE
+
+ Number of codes to fit baseline and biases =  26401
+ Compute baseline with sin(elev) between 0.05 and 0.90
+ Apriori codes biases from  2943 high elev obs :  34.829  34.715
+ Iteration   0: Obs used =  34025; Huge residuals =   1376; Large residuals =  13243
+ Iteration   1: Obs used =  45241; Huge residuals =      0; Large residuals =    651
+ Computed code bias (P1/P2)/m =     33.613    33.440
+ Computed baseline (X,Y,Z)/m =     -8.919    -4.982    -1.170
+ RMS of residuals /m =      0.596
+
+ Number of phase differences to fit baseline
+ L1/L2 =  25267
+ L5    =  13878
+ A priori baseline (X,Y,Z)/m =     -8.919    -4.982    -1.170
+  2876 clock jitters computed out of   2876 intervals
+ AVE jitter /ps =    0.2 RMS jitter /ps =    3.7
+
+ Iter  1 Large residuals L1=    1
+ Iter  1 Large residuals L2=    1
+ Iter  1 Large residuals L5=    5
+ Computed baseline L1 (X,Y,Z)/m =      0.598    -0.825    -0.709
+ RMS of residuals L1 /m =      0.003
+ Computed baseline L2 (X,Y,Z)/m =      0.596    -0.824    -0.706
+ RMS of residuals L2 /m =      0.004
+ Computed baseline L5 (X,Y,Z)/m =      0.716    -0.824    -0.727
+ RMS of residuals L5 /m =      0.004
+
+ Iter  2 Large residuals L1=    1
+ Iter  2 Large residuals L2=    1
+ Iter  2 Large residuals L5=    4
+ Computed baseline L1 (X,Y,Z)/m =      0.599    -0.825    -0.710
+ RMS of residuals L1 /m =      0.003
+ Computed baseline L2 (X,Y,Z)/m =      0.596    -0.824    -0.706
+ RMS of residuals L2 /m =      0.004
+ Computed baseline L5 (X,Y,Z)/m =      0.725    -0.824    -0.730
+ RMS of residuals L5 /m =      0.004
+
+ Iter  3 Large residuals L1=    1
+ Iter  3 Large residuals L2=    1
+ Iter  3 Large residuals L5=    4
+ Computed baseline L1 (X,Y,Z)/m =      0.599    -0.825    -0.710
+ RMS of residuals L1 /m =      0.003
+ Computed baseline L2 (X,Y,Z)/m =      0.596    -0.824    -0.706
+ RMS of residuals L2 /m =      0.004
+ Computed baseline L5 (X,Y,Z)/m =      0.729    -0.822    -0.730
+ RMS of residuals L5 /m =      0.004
+
+ New iteration of baseline
+ New apriori baseline (X,Y,Z)/m =     -8.321    -5.806    -1.878
+  2876 clock jitters computed out of   2876 intervals
+ AVE jitter /ps =   -0.0 RMS jitter /ps =    1.5
+
+ Iter  4 Large residuals L1=    1
+ Iter  4 Large residuals L2=    1
+ Iter  4 Large residuals L5=    4
+ Computed baseline L1 (X,Y,Z)/m =      0.005    -0.028    -0.020
+ RMS of residuals L1 /m =      0.003
+ Computed baseline L2 (X,Y,Z)/m =      0.003    -0.027    -0.016
+ RMS of residuals L2 /m =      0.004
+ Computed baseline L5 (X,Y,Z)/m =      0.133    -0.017    -0.044
+ RMS of residuals L5 /m =      0.004
+
+
+ Final baseline L1 (X,Y,Z)/m =     -8.316    -5.834    -1.898
+ Final baseline L2 (X,Y,Z)/m =     -8.318    -5.833    -1.895
+ Final baseline L5 (X,Y,Z)/m =     -8.188    -5.823    -1.923
+
+ COMPUTATION OF CODE DIFFERENCES
+
+ Total number of code differences =  88510
+
+ Global average of individual differences
+ Code #pts, ave/ns, rms/ns
+ C1:  26623   109.773     2.224
+ C2:  20480   109.101     2.207
+ P1:  25650   109.466     1.710
+ P2:  25647   108.910     2.068
+ D1:  19635   112.015     3.376
+ D2:  15957   110.435     2.478
+ R1:      0       NaN       NaN
+ R2:      0       NaN       NaN
+ E1:  17610   109.721     2.130
+ E5:  17744   110.277     1.587
+ B1:  22454   109.950     3.015
+ B2:   2374   110.323     2.443
+ BC:  19963   109.643     2.201
+ B5:  20244   110.225     1.797
+
+ Number of  300s epochs in out file =   288
+ Code #pts, median/ns, ave/ns, rms/ns
+ C1:   2670   109.759   109.755     1.155
+ C2:   2050   109.055   109.105     1.052
+ P1:   2557   109.433   109.453     0.955
+ P2:   2556   108.893   108.911     1.277
+ D1:   1967   112.070   111.990     1.849
+ D2:   1599   110.473   110.420     1.473
+ R1:      0     0.000       NaN       NaN
+ R2:      0     0.000       NaN       NaN
+ E1:   1768   109.688   109.713     1.054
+ E5:   1783   110.184   110.263     0.832
+ B1:   2260   109.916   109.942     1.563
+ B2:    238   110.519   110.277     1.238
+ BC:   2004   109.676   109.644     1.071
+ B5:   2038   110.205   110.245     0.900
