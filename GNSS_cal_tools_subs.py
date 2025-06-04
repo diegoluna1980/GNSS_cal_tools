@@ -145,7 +145,7 @@ def figures(dif,config,ts):
         # Plot time series for C1        
         plt.subplot(231)
         plt.plot(MJD, C1, 'b.',markeredgewidth=0.0,zorder=4,label='C1')
-        plt.title('Median: (' + str(round(np.median(C1),1)) + '+/-' + str(round(C1.std(),2)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(C1),1)) + '+/-' + str(round(C1.std(),1)) + ') ns')
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.ylabel('Time / ns', size = 14)
         plt.xlabel('MJD', size = 14)
@@ -161,7 +161,7 @@ def figures(dif,config,ts):
         # Plot time series for P1
         plt.subplot(232)
         plt.plot(MJD, P1, 'b.',markeredgewidth=0.0,zorder=4,label='P1')
-        plt.title('Median: (' + str(round(np.median(P1),1)) + '+/-' + str(round(P1.std(),2)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(P1),1)) + '+/-' + str(round(P1.std(),1)) + ') ns')
         plt.xlabel('MJD', size = 14)
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.grid(linestyle='dashed')
@@ -176,7 +176,7 @@ def figures(dif,config,ts):
         # Plot time series for P2
         plt.subplot(233)
         plt.plot(MJD, P2, 'b.',markeredgewidth=0.0,zorder=4,label='P2')
-        plt.title('Median: (' + str(round(np.median(P2),1)) + '+/-' + str(round(P2.std(),2)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(P2),1)) + '+/-' + str(round(P2.std(),1)) + ') ns')
         plt.xlabel('MJD', size = 14)
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.grid(linestyle='dashed')
@@ -470,13 +470,15 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         f"{round(sta2['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
     )
 
+    pop1 = dif.groupby(['MJD']).median()
+
     rawdiff = {
-        'medianC1' : round(dif['C1_corr'].median()/0.299792458, 2),
-        'stdC1' : round(dif['C1_corr'].std()/0.299792458, 1),
-        'medianP1' : round(dif['P1_corr'].median()/0.299792458, 2),
-        'stdP1' : round(dif['P1_corr'].std()/0.299792458, 1),
-        'medianP2' : round(dif['P2_corr'].median()/0.299792458, 2),
-        'stdP2' : round(dif['P2_corr'].std()/0.299792458, 1)
+        'medianC1' : round(pop1['C1_corr'].median()/0.299792458, 1),
+        'stdC1' : round(pop1['C1_corr'].std()/0.299792458, 1),
+        'medianP1' : round(pop1['P1_corr'].median()/0.299792458, 1),
+        'stdP1' : round(pop1['P1_corr'].std()/0.299792458, 1),
+        'medianP2' : round(pop1['P2_corr'].median()/0.299792458, 1),
+        'stdP2' : round(pop1['P2_corr'].std()/0.299792458, 1)
         }
 
 
