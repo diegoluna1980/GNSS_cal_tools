@@ -20,6 +20,8 @@ Measurements have to be performed in a common-clock / zero-baseline configuratio
 
 
 
+
+
 ![](/home/diego/repos/GNSS_cal_tools/zerobaseline.png)
 
 
