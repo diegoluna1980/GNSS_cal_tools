@@ -28,8 +28,6 @@ pandas numpy matplotlib georinex allantools
 
 
 
-
-
 ## Usage
 
 ### What you need
@@ -47,6 +45,8 @@ Copy in one folder:
 ### Configuration
 
 Edit the configuration section at the top of GNSS_cal_tools.py to set your parameters.
+
+#### Example:
 
 ```python
 config = {
@@ -80,7 +80,7 @@ Edit the names of your RINEX files in GNSS_cal_tools.py and enter the Cartesian 
    - `pos_a`: Cartesian coordinates of station a
    - `pos_b`: Cartesian coordinates of station b
 
-
+#### Example:
 
 ```python
 # RINEX OBS files
@@ -123,8 +123,42 @@ Run the script directly from your IDE or from the console:
 python GNSS_calibration_transfer.py
 ```
 
+## Limitations
 
+- Currently only supports processing **one daily RINEX** file per station
+
+- GNSS_cal_tools has been tested only on 30 seconds of observation interval.
+
+- Only tested with GPS data
+
+- Does not support LZ files (cases with different references)
+
+
+
+## Outputs
+
+## Outputs
+
+The script generates:
+
+1. **Text Output**:
+   
+   - Processing summary
+   
+   - Calculated delays for the DUT receiver using the expression:
+     
+     $RAWDIF_{A-B} = \Delta CABdly_{A-B} + \Delta INTdly_{A-B} - \Delta REFdly_{A-B}$
+   
+   - Statistical analysis of time differences
+
+2. **Graphical Output** (when enabled in config):
+   
+   - Elevation histograms
+   
+   - Time difference plots
+   
+   - Allan deviation plots
 
 ## Authors
 
-Diego Luna
+Diego Luna.   luna at inti.gob.ar
