@@ -6,6 +6,24 @@ GNSS_cal_tools is a set of tools to transfer the calibration from one GNSS stati
 
 This Python script transfers the calibration from a reference GNSS station to a Device Under Test (DUT) station by comparing observations between the two receivers. The tool calculates internal receiver delays for the DUT station based on a known calibrated reference station.
 
+The definition of the delays is the usual in GNSS calibrations:
+
+![](/home/diego/Escritorio/delays.png)
+
+
+
+CABDLY and REFDLY are delays originated by the propagation of signals in cables, so they are measured in the usual way [Reference]
+
+The value transfered from one receiver to another is <span style="color:blue">INTDLY</span>.
+
+Measurements have to be performed in a common-clock / zero-baseline configuration:
+
+
+
+![](/home/diego/Escritorio/zerobaseline.png)
+
+
+
 ## Dependencies
 
 ```python
@@ -36,9 +54,9 @@ Copy in one folder:
 
 - GNSS_cal_tools.py *and* GNSS_cal_tools_subs.py.
 
-- The two RINEX observation files of the stations.
+- The two daily RINEX observation files of the stations.
 
-- The RINEX navigation file. 
+- The RINEX navigation file for the day of the observations. 
   
   
 
