@@ -10,6 +10,9 @@ import os
 import time
 import datetime
 import numpy as np
+from conf import (config, file_a, file_b, file_nav, pos_a, pos_b, delays_a, 
+                  delays_b
+)
 
 from GNSS_cal_tools_subs import (
     OExyz, dfSTAgen, dfNAVgen, C1P1, outputs,
@@ -20,56 +23,6 @@ from GNSS_cal_tools_subs import (
 # Only one RINEX file per station
 # No LZ files (the case when the two receivers don't have the same reference)
 # Tested only for GPS
-
-# =============================================================================
-# Start of inputs
-# =============================================================================
-
-config = {
-    'elmin': 5,    # Elevation minimum, in degrees
-    'intcod': 300, # Default: one code average every 300 s
-    'ithr': 20,    # Default code threshold = 20 ns
-    'thres': 0.05, # Option to read residual threshold (L336)
-    'SYS': 'G',    # System to calibrate (GPS:G, Galileo:R, Glonass:R, Beidu:C)
-    # PLOT AND CALCULATION OPTIONS
-    'plotelevations': True,        # Plot histograms of elevations
-    'timeplots': True,             # Plot time differneces and allan deviations
-    'calculate_delays': True,      # Calculation of delays in DUT receiver 
-}
-
-# RINEX OBS files
-file_a = 'AGGO2350.24O'
-file_b = 'SIMr2350.24O'  # The station that will be calibrated
-
-# RINEX navigation file
-file_nav = 'BRDC00IGS_R_20242350000_01D_MN.rnx'
-
-# Positions extracted from NRCan PPP solutions
-pos_a = np.array([2765121.467, -4449250.973, -3626403.769])
-pos_b = np.array([2765129.907, -4449245.382, -3626402.075])
-
-# Delays in receivers (optional)
-# delays_a are the values in the calibrated receiver
-delays_a = {
-    'INTdlyC1': 31.9,
-    'INTdlyP1': 30.1,
-    'INTdlyP2': 028.3,    
-    'CABdly': 207.9,
-    'REFdly': 12.3,
-    }
-
-# delays_b are the values in the DUT receiver
-delays_b = {
-    'INTdlyC1': np.nan,  # Leave NaN. Will be calculated
-    'INTdlyP1': np.nan,  # Leave NaN. Will be calculated
-    'INTdlyP2': np.nan,  # Leave NaN. Will be calculated
-    'CABdly': 328.3,
-    'REFdly': 13.7,
-    }
-
-# =============================================================================
-# End of inputs
-# =============================================================================
 
 # Start time
 start_time = time.time()
@@ -84,7 +37,6 @@ for f in [file_a, file_b, file_nav]:
 
 if not os.path.exists('outputs'):
     os.makedirs('outputs')
-
 
 # Date
 ts = time.time()
@@ -133,7 +85,7 @@ rawdiff = outputs(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
 
 # Results of calibration (optional)
 if config['calculate_delays']:
-    delays_b = calibration(rawdiff, delays_a, delays_b)
+    delays_b = calibration(rawdiff, delays_a, delays_b, sta_a, sta_b)
 
 # Figure Outputs
 figures(dif, config, ts)

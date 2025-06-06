@@ -44,7 +44,7 @@ pandas numpy matplotlib georinex allantools
 
 Copy in one folder:
 
-- GNSS_cal_tools.py *and* GNSS_cal_tools_subs.py.
+- GNSS_cal_tools.py **+** GNSS_cal_tools_subs.py **+** conf.py.
 
 - The two daily RINEX observation files of the stations.
 
@@ -52,7 +52,7 @@ Copy in one folder:
 
 ### Configuration
 
-Edit the configuration section at the top of GNSS_cal_tools.py to set your parameters.
+Edit the configuration in conf.py to set your parameters.
 
 #### Example:
 
@@ -69,7 +69,7 @@ config = {
 }
 ```
 
-Edit the names of your RINEX files in GNSS_cal_tools.py and enter the Cartesian coordinates of the stations. This positions can be calculated, for example, using the  Precise Point Positioning service at []([Precise Point Positioning](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/tools-outils/ppp.php))
+Edit the names of your RINEX files in conf.py and enter the Cartesian Coordinates of the stations. This positions can be calculated, for example, using the Precise Point Positioning service at []([Precise Point Positioning](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/tools-outils/ppp.php))
 
 1. **RINEX Observation Files**:
    

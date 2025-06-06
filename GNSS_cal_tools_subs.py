@@ -27,7 +27,7 @@ MU = 3.9860050e14
 # OMEGAE - WGS84 value of the Earth's rotation rate in rad/sec
 OMEGAE = 7.292115e-5
 
-def calibration(rawdiff, delays_a, delays_b):
+def calibration(rawdiff, delays_a, delays_b, sta_a, sta_b):
     
     """
     Adjusts the internal delays (INTdly) of device B based on the difference 
@@ -64,6 +64,21 @@ def calibration(rawdiff, delays_a, delays_b):
     delays_b['INTdlyC1'] = delays_a['INTdlyC1'] - deltaINTdlyC1 
     delays_b['INTdlyP1'] = delays_a['INTdlyP1'] - deltaINTdlyP1
     delays_b['INTdlyP2'] = delays_a['INTdlyP2'] - deltaINTdlyP2
+    
+    # Calibration outputs
+    
+    filename = sta_a.filename.partition(".")[0] + sta_b.filename.partition(".")[0]
+    #file_sum = open('./outputs/' + filename + '_results.txt', 'w')
+    
+    with open('./outputs/' + filename + '_results.txt', "a") as file:
+        file.write('\nCalculated delays in station ' + sta_b.filename + '(DUT station):\n')
+        for key, value in delays_b.items():
+            file.write(f"{key}: {value}\n")
+        file.write('\nDelays in station ' + sta_b.filename + '(Reference station):\n')
+        for key, value in delays_a.items():
+            file.write(f"{key}: {value}\n")
+        file.write('\n')
+
     
     return(delays_b)
 
