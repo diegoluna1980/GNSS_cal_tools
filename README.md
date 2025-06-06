@@ -1,6 +1,6 @@
 # GNSS_cal_tools
 
-GNSS_cal_tools is a set of tools to transfer the calibration from one GNSS station to another.
+GNSS_cal_tools is a set of tools to transfer the calibration from one GNSS station (Reference Station) to another (Device Under Test station).
 
 ## Description
 
@@ -8,11 +8,7 @@ This Python script transfers the calibration from a reference GNSS station to a 
 
 The definition of the delays is the usual in GNSS calibrations:
 
-
 ![](/images/delays.png)
-
-
-
 
 CABDLY and REFDLY are delays originated by the propagation of signals in cables, so they are measured in the usual way [Reference]
 
@@ -20,15 +16,7 @@ The value transfered from one receiver to another is <span style="color:blue">IN
 
 Measurements have to be performed in a common-clock / zero-baseline configuration:
 
-
-
-
-
-
 ![](/images/zerobaseline.png)
-
-
-
 
 ## Dependencies
 
@@ -50,8 +38,6 @@ pandas numpy matplotlib georinex allantools
 
 - Currently tested only with GPS data
 
-
-
 ## Usage
 
 ### What you need
@@ -63,8 +49,6 @@ Copy in one folder:
 - The two daily RINEX observation files of the stations.
 
 - The RINEX navigation file for the day of the observations. 
-  
-  
 
 ### Configuration
 
@@ -86,8 +70,6 @@ config = {
 ```
 
 Edit the names of your RINEX files in GNSS_cal_tools.py and enter the Cartesian coordinates of the stations. This positions can be calculated, for example, using the  Precise Point Positioning service at []([Precise Point Positioning](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/tools-outils/ppp.php))
-
-
 
 1. **RINEX Observation Files**:
    
@@ -156,8 +138,6 @@ python GNSS_calibration_transfer.py
 - Only tested with GPS data
 
 - Does not support LZ files (cases with different references)
-
-
 
 # 
 
