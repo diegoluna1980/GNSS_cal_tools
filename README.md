@@ -145,7 +145,7 @@ python GNSS_calibration_transfer.py
 
 ## Outputs
 
-The script generates:
+The script generates an ouput folder with the following:
 
 1. **Text Output**:
    

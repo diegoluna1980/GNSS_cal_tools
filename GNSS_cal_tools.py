@@ -77,10 +77,14 @@ start_time = time.time()
 # Version
 VERSION = '2/1/25'
 
-# See if files are there
+# See if files and output folders are there
 for f in [file_a, file_b, file_nav]:
     if not os.path.exists(f):
         raise FileNotFoundError(f'File not found: {f}')
+
+if not os.path.exists('outputs'):
+    os.makedirs('outputs')
+
 
 # Date
 ts = time.time()
@@ -91,13 +95,13 @@ print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
       ': Loading NAV and OBS files')
 
 nav = loader(file_nav, config)
-sta1 = loader(file_a, config)
-sta2 = loader(file_b, config)
+sta_a = loader(file_a, config)
+sta_b = loader(file_b, config)
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE')
 
 # Generation of dataframes
-df_sta1 = dfSTAgen(sta1)
-df_sta2 = dfSTAgen(sta2)
+df_sta_a = dfSTAgen(sta_a)
+df_sta_b = dfSTAgen(sta_b)
 dfnav = dfNAVgen(nav)
 
 # Positions, distance and interval
@@ -110,22 +114,22 @@ first_occurrence_idx = dfnav.groupby('sv').apply(lambda x: x.index[0])
 dfnav_first = dfnav.loc[first_occurrence_idx]
 
 # Adding of EARTH FIXED COORDINATES (subroutine OExyz of dclrinex)
-df_sta1 = OExyz(dfnav_first, df_sta1)
-df_sta2 = OExyz(dfnav_first, df_sta2)
+df_sta_a = OExyz(dfnav_first, df_sta_a)
+df_sta_b = OExyz(dfnav_first, df_sta_b)
 
 # Rejection at low elevation (line 1554 of dclrinex)
-df_sta1 = ElevationReject(df_sta1, pos_a, config, sta1.filename)
-df_sta2 = ElevationReject(df_sta2, pos_b, config, sta2.filename)
+df_sta_a = ElevationReject(df_sta_a, pos_a, config, sta_a.filename)
+df_sta_b = ElevationReject(df_sta_b, pos_b, config, sta_b.filename)
 
 # Add C1P1 bias
-sta1 = C1P1(sta1,df_sta1)
-sta2 = C1P1(sta2,df_sta2)
+sta_a = C1P1(sta_a,df_sta_a)
+sta_b = C1P1(sta_b,df_sta_b)
 
 # Genero diferencias
-dif = DIFgen(df_sta1, df_sta2, config, pos_a, pos_b)
+dif = DIFgen(df_sta_a, df_sta_b, config, pos_a, pos_b)
 
 # Text Outputs and rawdif calculation. rawdiff = a - b
-rawdiff = outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif)
+rawdiff = outputs(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
 
 # Results of calibration (optional)
 if config['calculate_delays']:

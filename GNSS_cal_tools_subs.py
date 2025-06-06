@@ -223,7 +223,7 @@ def figures(dif,config,ts):
         
         # Global title and save
         plt.suptitle('C1, P1, and P2 plots - GNSS_cal_tools.py', fontsize=16,  fontweight='bold')
-        destino = 'C1P1P2plotsGNSS_cal_tools.pdf'
+        destino = './outputs/C1P1P2plotsGNSS_cal_tools.pdf'
         fig1.savefig(destino,facecolor='0.9', dpi = 200)
         plt.close()
 
@@ -411,7 +411,7 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     # Open file
     filename = sta1.filename.partition(".")[0] + sta2.filename.partition(".")[0]
-    file_sum = open(filename + '_results.txt', 'w')
+    file_sum = open('./outputs/' + filename + '_results.txt', 'w')
     
     file_sum.write(
     f" SIM_GNSS_cal Version: {VERSION}\n"
@@ -504,7 +504,7 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     cols_a_exportar['C1']  = cols_a_exportar['C1'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['P1']  = cols_a_exportar['P1'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['P2']  = cols_a_exportar['P2'].map(lambda x: f"{x:.2f}")
-    cols_a_exportar.to_csv( filename + '_measurements.txt', sep='\t', index=False)
+    cols_a_exportar.to_csv( './outputs/' + filename + '_measurements.txt', sep='\t', index=False)
     
 
     return(rawdiff)
@@ -565,7 +565,7 @@ def ElevationReject(dfSTA,pos,config,name):
         plt.tight_layout()
 
         # Save image 
-        plt.savefig('Elevation_' + name + 'histogram.pdf', dpi=300,
+        plt.savefig('./outputs/Elevation_' + name + 'histogram.pdf', dpi=300,
                     bbox_inches='tight')
         plt.show()    
     return(dfSTA)
