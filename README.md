@@ -69,7 +69,7 @@ config = {
 }
 ```
 
-Edit the names of your RINEX files in conf.py and enter the Cartesian Coordinates of the stations. This positions can be calculated, for example, using the Precise Point Positioning service at []([Precise Point Positioning](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/tools-outils/ppp.php))
+Edit the names of your RINEX files in conf.py and enter the Cartesian Coordinates of the stations. This positions can be calculated, for example, using the Canadian Spatial Reference System Precise Point Positioning (CSRS-PPP) at: https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/tools-outils/ppp.php
 
 1. **RINEX Observation Files**:
    
