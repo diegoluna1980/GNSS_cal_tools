@@ -139,7 +139,9 @@ python GNSS_calibration_transfer.py
 
 - Does not support LZ files (cases with different references)
 
-# 
+- Does not calculate uncertainties
+
+ 
 
 ## Outputs
 
