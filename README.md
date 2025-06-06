@@ -8,7 +8,9 @@ This Python script transfers the calibration from a reference GNSS station to a 
 
 The definition of the delays is the usual in GNSS calibrations:
 
+
 ![](/images/delays.png)
+
 
 
 
@@ -22,7 +24,9 @@ Measurements have to be performed in a common-clock / zero-baseline configuratio
 
 
 
+
 ![](/images/zerobaseline.png)
+
 
 
 
