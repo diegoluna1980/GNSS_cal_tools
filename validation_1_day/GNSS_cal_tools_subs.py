@@ -27,7 +27,7 @@ MU = 3.9860050e14
 # OMEGAE - WGS84 value of the Earth's rotation rate in rad/sec
 OMEGAE = 7.292115e-5
 
-def calibration(rawdiff, delays_a, delays_b):
+def calibration(rawdiff, delays_a, delays_b, sta_a, sta_b):
     
     """
     Adjusts the internal delays (INTdly) of device B based on the difference 
@@ -64,6 +64,21 @@ def calibration(rawdiff, delays_a, delays_b):
     delays_b['INTdlyC1'] = delays_a['INTdlyC1'] - deltaINTdlyC1 
     delays_b['INTdlyP1'] = delays_a['INTdlyP1'] - deltaINTdlyP1
     delays_b['INTdlyP2'] = delays_a['INTdlyP2'] - deltaINTdlyP2
+    
+    # Calibration outputs
+    
+    filename = sta_a.filename.partition(".")[0] + sta_b.filename.partition(".")[0]
+    #file_sum = open('./outputs/' + filename + '_results.txt', 'w')
+    
+    with open('./outputs/' + filename + '_results.txt', "a") as file:
+        file.write('\nCalculated delays in station ' + sta_b.filename + '(DUT station):\n')
+        for key, value in delays_b.items():
+            file.write(f"{key}: {value}\n")
+        file.write('\nDelays in station ' + sta_b.filename + '(Reference station):\n')
+        for key, value in delays_a.items():
+            file.write(f"{key}: {value}\n")
+        file.write('\n')
+
     
     return(delays_b)
 
@@ -145,7 +160,7 @@ def figures(dif,config,ts):
         # Plot time series for C1        
         plt.subplot(231)
         plt.plot(MJD, C1, 'b.',markeredgewidth=0.0,zorder=4,label='C1')
-        plt.title('Median: (' + str(round(np.median(C1),1)) + '+/-' + str(round(C1.std(),2)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(C1),1)) + '+/-' + str(round(C1.std(),1)) + ') ns')
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.ylabel('Time / ns', size = 14)
         plt.xlabel('MJD', size = 14)
@@ -161,7 +176,7 @@ def figures(dif,config,ts):
         # Plot time series for P1
         plt.subplot(232)
         plt.plot(MJD, P1, 'b.',markeredgewidth=0.0,zorder=4,label='P1')
-        plt.title('Median: (' + str(round(np.median(P1),1)) + '+/-' + str(round(P1.std(),2)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(P1),1)) + '+/-' + str(round(P1.std(),1)) + ') ns')
         plt.xlabel('MJD', size = 14)
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.grid(linestyle='dashed')
@@ -176,7 +191,7 @@ def figures(dif,config,ts):
         # Plot time series for P2
         plt.subplot(233)
         plt.plot(MJD, P2, 'b.',markeredgewidth=0.0,zorder=4,label='P2')
-        plt.title('Median: (' + str(round(np.median(P2),1)) + '+/-' + str(round(P2.std(),2)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(P2),1)) + '+/-' + str(round(P2.std(),1)) + ') ns')
         plt.xlabel('MJD', size = 14)
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.grid(linestyle='dashed')
@@ -223,7 +238,7 @@ def figures(dif,config,ts):
         
         # Global title and save
         plt.suptitle('C1, P1, and P2 plots - GNSS_cal_tools.py', fontsize=16,  fontweight='bold')
-        destino = 'C1P1P2plotsGNSS_cal_tools.pdf'
+        destino = './outputs/C1P1P2plotsGNSS_cal_tools.pdf'
         fig1.savefig(destino,facecolor='0.9', dpi = 200)
         plt.close()
 
@@ -411,7 +426,7 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     # Open file
     filename = sta1.filename.partition(".")[0] + sta2.filename.partition(".")[0]
-    file_sum = open(filename + '_results.txt', 'w')
+    file_sum = open('./outputs/' + filename + '_results.txt', 'w')
     
     file_sum.write(
     f" SIM_GNSS_cal Version: {VERSION}\n"
@@ -470,13 +485,15 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         f"{round(sta2['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
     )
 
+    pop1 = dif.groupby(['MJD']).median()
+
     rawdiff = {
-        'medianC1' : round(dif['C1_corr'].median()/0.299792458, 2),
-        'stdC1' : round(dif['C1_corr'].std()/0.299792458, 1),
-        'medianP1' : round(dif['P1_corr'].median()/0.299792458, 2),
-        'stdP1' : round(dif['P1_corr'].std()/0.299792458, 1),
-        'medianP2' : round(dif['P2_corr'].median()/0.299792458, 2),
-        'stdP2' : round(dif['P2_corr'].std()/0.299792458, 1)
+        'medianC1' : round(pop1['C1_corr'].median()/0.299792458, 1),
+        'stdC1' : round(pop1['C1_corr'].std()/0.299792458, 1),
+        'medianP1' : round(pop1['P1_corr'].median()/0.299792458, 1),
+        'stdP1' : round(pop1['P1_corr'].std()/0.299792458, 1),
+        'medianP2' : round(pop1['P2_corr'].median()/0.299792458, 1),
+        'stdP2' : round(pop1['P2_corr'].std()/0.299792458, 1)
         }
 
 
@@ -502,16 +519,32 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     cols_a_exportar['C1']  = cols_a_exportar['C1'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['P1']  = cols_a_exportar['P1'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['P2']  = cols_a_exportar['P2'].map(lambda x: f"{x:.2f}")
-    cols_a_exportar.to_csv( filename + '_measurements.txt', sep='\t', index=False)
+    cols_a_exportar.to_csv( './outputs/' + filename + '_measurements.txt', sep='\t', index=False)
     
 
     return(rawdiff)
 
 def ElevationReject(dfSTA,pos,config,name):
+    """
+    Filters satellite data based on elevation angle and optionally plots an elevation histogram.
     
+    Args:
+        dfSTA (pd.DataFrame): DataFrame containing satellite coordinates (X, Y, Z).
+        pos (tuple): Observer's position (x, y, z) in the same coordinate system.
+        config (dict): Configuration dictionary with keys:
+            - 'elmin' (float): Minimum elevation threshold (degrees).
+            - 'plotelevations' (bool): If True, generates an elevation histogram.
+        name (str): Name of the station/satellite (used for labeling).
+    
+    Returns:
+        pd.DataFrame: Filtered DataFrame with satellites above the elevation threshold.
+    """
+    
+    # Extract minimum elevation threshold from config
     ielmin = config['elmin']
-    xsta, ysta, zsta = pos
+    xsta, ysta, zsta = pos  # Observer's position
 
+    # Compute satellite positions relative to observer
     xsat =  dfSTA['X'].to_numpy() - xsta
     ysat =  dfSTA['Y'].to_numpy() - ysta 
     zsat =  dfSTA['Z'].to_numpy() - zsta
@@ -519,36 +552,42 @@ def ElevationReject(dfSTA,pos,config,name):
     # sinelv = (
              # (xsta*xsat + ysta*ysat + zsta*zsat)/np.linalg.norm(pos)/np.sqrt(xsat**2 + ysat**2 + zsat**2)
              #   )
-    
+
+    # Calculate sine of elevation angle using dot product and norms
     dot_product = xsta*xsat + ysta*ysat + zsta*zsat
     r_norm = np.sqrt(xsta**2 + ysta**2 + zsta**2)
     s_norm = np.sqrt(xsat**2 + ysat**2 + zsat**2)
     sinelv = dot_product / (r_norm * s_norm) # De las dos formas da lo mismo
     
+    # Convert to degrees and store in DataFrame    
     dfSTA['elevation'] = np.arcsin(sinelv)*180/np.pi
-    
+
+    # Count and filter out low-elevation satellites    
     low_elevations = (dfSTA['elevation'] < ielmin).sum()
     dfSTA = dfSTA[dfSTA['elevation'] >= ielmin]
     
+    # Print rejection statistics
     print('Number of measurements below elevation thereshold (' + str(ielmin) + ' degrees):')
     print(name + ' --> REJECTED: ' + str(low_elevations) + '. ACCEPTED: ' + str(dfSTA.count().MJD) + '\n')
     
-    # =============================================================================
-    # Generation of elevation histogram
-    # =============================================================================
+
+    # Generate elevation histogram if enabled in config
     if config['plotelevations']:
         
-        data = dfSTA['elevation']
-
         # Set up the figure 
         plt.figure(figsize=(10, 6), dpi=300)  # High resolution
         sns.set_style("white")  # Clean background
         sns.set_context("paper", font_scale=1.4)
 
-        # Create histogram 
+        # Create histogram (bins: 0-95 in steps of 5)
         bins = np.arange(0, 100, 5)  # 0-95 in steps of 5
-        sns.histplot(data=data, bins=bins, color='steelblue', 
-                            edgecolor='white', linewidth=1.2, alpha=0.85)
+        sns.histplot(data = dfSTA['elevation'],
+                     bins=bins,
+                     color='steelblue',
+                     edgecolor='white',
+                     linewidth=1.2,
+                     alpha=0.85
+                     )
 
         # Customize the plot
         plt.title(name, pad=20, fontweight='bold')
@@ -556,14 +595,12 @@ def ElevationReject(dfSTA,pos,config,name):
         plt.ylabel('Number of satellites', labelpad=10)
         plt.xticks(bins, rotation=45)
         plt.xlim(0, 95)  
-        
-        # Add grid 
         plt.grid(axis='y', alpha=0.3)
         plt.grid(axis='x', alpha=0.1)
         plt.tight_layout()
 
-        # Save image 
-        plt.savefig('Elevation_' + name + 'histogram.pdf', dpi=300,
+        # Save image and show plot
+        plt.savefig('./outputs/Elevation_' + name + 'histogram.pdf', dpi=300,
                     bbox_inches='tight')
         plt.show()    
     return(dfSTA)
@@ -575,6 +612,23 @@ def C1P1(sta,df_sta):
 
 def OExyz(dfnav_first,dfSTA):
     
+    """
+     Computes satellite positions in Earth-Centered, Earth-Fixed (ECEF) coordinates 
+     using broadcast ephemeris data and merges them with observation data.
+    
+     Args:
+         dfnav_first (pd.DataFrame): DataFrame containing broadcast ephemeris parameters 
+                                    (e.g., semi-major axis, eccentricity, mean anomaly).
+         dfSTA (pd.DataFrame): Observation DataFrame with satellite IDs ('sv') and 
+                               observation times ('MJD').
+    
+     Returns:
+         pd.DataFrame: Augmented observation DataFrame with satellite ECEF coordinates (X, Y, Z).
+     """
+    
+    # Merge Ephemeris and Observation Data ---
+    # Compute mean motion (rad/s) and corrected mean motion
+
     # Add MJD_O, Corrected mean motion, Mean Anomaly an Eccentricity to 
     # observation dataframe
 
@@ -586,13 +640,16 @@ def OExyz(dfnav_first,dfSTA):
     
     dfSTA = dfSTA.merge(dfnav_first, on="sv", how="left")
     
+    # Compute Orbital Parameters
     # A - Semi-major axis a in meters
     A = dfSTA['sqrtA'].to_numpy()**2 #Checked
     #print(str(np.min(A)) + ' < A < ' + str(np.max(A)))        
 
+    # Time since ephemeris reference epoch (seconds)
     # Calculate TK - Time from ephemeris reference epoch in sec
     dfSTA['TK'] = (dfSTA['MJD'] - dfSTA['MJD_N'])*86400 #Checked
     
+    # Mean anomaly (radians): M = M0 + N * TK
     # Calculate Mean Anomaly
     dfSTA['MK'] = dfSTA['M0'] + dfSTA['N']*dfSTA['TK']
     # se muestra en 
@@ -606,6 +663,8 @@ def OExyz(dfnav_first,dfSTA):
         """Jacobian (derivative) of Kepler's equation: f'(E) = 1 - e*cos(E)"""
         return 1 - e * np.cos(E)
     
+    # Numerically solve Kepler's equation for each satellite
+
     result = np.zeros(dfSTA.shape[0])
     for i in range(0,dfSTA.shape[0]):
         M = dfSTA['MK'][i]              # Mean anomaly in radians
@@ -634,14 +693,23 @@ def OExyz(dfnav_first,dfSTA):
     # PHI -Argument of latitude
     phi = vk + dfSTA['omega'].to_numpy()
     
+    # Harmonic corrections for orbit perturbations
     # DUK -Argument of Latitue Correction
-    DUK = dfSTA['Cus'].to_numpy()*np.sin(2*phi) + dfSTA['Cuc'].to_numpy()*np.cos(2*phi) 
+    DUK = (
+        dfSTA['Cus'].to_numpy()*np.sin(2*phi) +
+        dfSTA['Cuc'].to_numpy()*np.cos(2*phi)
+        )
     
     # DRK -Radius Correction
-    DRK = dfSTA['Crc'].to_numpy()*np.cos(2*phi) + dfSTA['Crs'].to_numpy()*np.sin(2*phi)
+    DRK = (
+        dfSTA['Crc'].to_numpy()*np.cos(2*phi) +
+        dfSTA['Crs'].to_numpy()*np.sin(2*phi)
+        )
     
     # DIK -Correction to Inclination
-    DIK = dfSTA['Cic'].to_numpy()*np.cos(2*phi) + dfSTA['Cis'].to_numpy()*np.sin(2*phi)
+    DIK = (dfSTA['Cic'].to_numpy()*np.cos(2*phi) +
+           dfSTA['Cis'].to_numpy()*np.sin(2*phi)
+           )
     
     # UK - Corrected Argument of Latitude
     UK = phi + DUK
