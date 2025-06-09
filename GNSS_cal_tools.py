@@ -16,7 +16,7 @@ from conf import (config, file_a, file_b, file_nav, pos_a, pos_b, delays_a,
 
 from GNSS_cal_tools_subs import (
     OExyz, dfSTAgen, dfNAVgen, C1P1, outputs,
-    ElevationReject, DIFgen, figures, loader, calibration
+    ElevationReject, DIFgen, figures, loader, calibration, DIFgen1
 )
 
 # Limitations:
@@ -45,11 +45,10 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 # Loading data from files
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
       ': Loading NAV and OBS files')
-
 nav = loader(file_nav, config)
 sta_a = loader(file_a, config)
 sta_b = loader(file_b, config)
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE')
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE\n')
 
 # Generation of dataframes
 df_sta_a = dfSTAgen(sta_a)
@@ -62,8 +61,13 @@ dist = np.linalg.norm(x)
 
 # Create a reduced dataframe of ephemeris, with only one entry per sat, per day
 # Keep first non-NAN entrance of each sv:
+
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
+      ': Creation of dataframe for epehemeris')    
 first_occurrence_idx = dfnav.groupby('sv').apply(lambda x: x.index[0])
 dfnav_first = dfnav.loc[first_occurrence_idx]
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE')
+
 
 # Adding of EARTH FIXED COORDINATES (subroutine OExyz of dclrinex)
 df_sta_a = OExyz(dfnav_first, df_sta_a)
@@ -77,8 +81,13 @@ df_sta_b = ElevationReject(df_sta_b, pos_b, config, sta_b.filename)
 sta_a = C1P1(sta_a,df_sta_a)
 sta_b = C1P1(sta_b,df_sta_b)
 
+
 # Genero diferencias
-dif = DIFgen(df_sta_a, df_sta_b, config, pos_a, pos_b)
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
+      ': Creation of dataframe of time differences')  
+dif = DIFgen1(df_sta_a, df_sta_b, config, pos_a, pos_b)
+#dif = DIFgen(df_sta_a, df_sta_b, config, pos_a, pos_b)
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE\n')
 
 # Text Outputs and rawdif calculation. rawdiff = a - b
 rawdiff = outputs(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
