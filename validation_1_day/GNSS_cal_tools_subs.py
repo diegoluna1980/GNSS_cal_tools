@@ -61,9 +61,9 @@ def calibration(rawdiff, delays_a, delays_b, sta_a, sta_b):
     
     # Update device B's internal delays by subtracting the calculated differences
     # from device A's internal delays    
-    delays_b['INTdlyC1'] = delays_a['INTdlyC1'] - deltaINTdlyC1 
-    delays_b['INTdlyP1'] = delays_a['INTdlyP1'] - deltaINTdlyP1
-    delays_b['INTdlyP2'] = delays_a['INTdlyP2'] - deltaINTdlyP2
+    delays_b['INTdlyC1'] = round(delays_a['INTdlyC1'] - deltaINTdlyC1,1) 
+    delays_b['INTdlyP1'] = round(delays_a['INTdlyP1'] - deltaINTdlyP1,1)
+    delays_b['INTdlyP2'] = round(delays_a['INTdlyP2'] - deltaINTdlyP2,1)
     
     # Calibration outputs
     
@@ -74,7 +74,7 @@ def calibration(rawdiff, delays_a, delays_b, sta_a, sta_b):
         file.write('\nCalculated delays in station ' + sta_b.filename + '(DUT station):\n')
         for key, value in delays_b.items():
             file.write(f"{key}: {value}\n")
-        file.write('\nDelays in station ' + sta_b.filename + '(Reference station):\n')
+        file.write('\nDelays in station ' + sta_a.filename + '(Reference station):\n')
         for key, value in delays_a.items():
             file.write(f"{key}: {value}\n")
         file.write('\n')
@@ -241,6 +241,85 @@ def figures(dif,config,ts):
         destino = './outputs/C1P1P2plotsGNSS_cal_tools.pdf'
         fig1.savefig(destino,facecolor='0.9', dpi = 200)
         plt.close()
+
+def DIFgen1(dfSTA1, dfSTA2, config, pos1, pos2):
+    """
+    Computes observation differences between two GNSS stations after temporal alignment
+    and satellite-based geometric corrections.
+
+    Parameters
+    ----------
+    dfSTA1 : pd.DataFrame
+        Observation data from station 1. Must include 'MJD', 'sv', 'C1', 'P1', 'P2', 'X', 'Y', 'Z', 'elevation'.
+    dfSTA2 : pd.DataFrame
+        Observation data from station 2. Must include 'MJD', 'sv', 'C1', 'P1', 'P2'.
+    config : dict
+        Configuration dictionary, must include 'intcod' (integration time in seconds).
+    pos1 : np.ndarray
+        ECEF coordinates of station 1 (3-element array).
+    pos2 : np.ndarray
+        ECEF coordinates of station 2 (3-element array).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing aligned satellite observations, differences and geometry-corrected values.
+    """
+
+    codint = config['intcod'] / 86400  # Convert integration interval to days
+
+    # Round MJD to the nearest integration time
+    dfSTA1['MJD_bin'] = (dfSTA1['MJD'] / codint).round() * codint
+    dfSTA2['MJD_bin'] = (dfSTA2['MJD'] / codint).round() * codint
+
+    # Median values per (MJD_bin, sv) for both stations
+    grp_cols = ['MJD_bin', 'sv']
+    agg_cols1 = ['C1', 'P1', 'P2', 'X', 'Y', 'Z', 'elevation']
+    agg_cols2 = ['C1', 'P1', 'P2']
+
+    dat1 = dfSTA1.groupby(grp_cols)[agg_cols1].median().reset_index()
+    dat2 = dfSTA2.groupby(grp_cols)[agg_cols2].median().reset_index()
+
+    # Merge aligned records
+    dif = pd.merge(dat1, dat2, on=grp_cols, suffixes=('_1', '_2'))
+
+    # Calculate observation differences
+    dif['C1'] = dif['C1_1'] - dif['C1_2']
+    dif['P1'] = dif['P1_1'] - dif['P1_2']
+    dif['P2'] = dif['P2_1'] - dif['P2_2']
+    dif['P1-P2'] = dif['P1'] - dif['P2']
+
+    # Remove gross outliers
+    dif = dif[(dif[['C1', 'P1', 'P2']].abs() <= 300).all(axis=1)]
+    dif = dif[dif['P1-P2'].abs() <= 30]
+
+    # Median Absolute Deviation (MAD) filtering
+    def mad_filter(col, u=3):
+        med = col.median()
+        mad = 1.4826 * np.median(np.abs(col - med))
+        return (col - med).abs() <= u * mad
+
+    for col in ['C1', 'P1', 'P2']:
+        dif = dif[mad_filter(dif[col])]
+
+    # Geometry correction
+    x = pos2 - pos1
+    xsat = dif['X'] - pos1[0]
+    ysat = dif['Y'] - pos1[1]
+    zsat = dif['Z'] - pos1[2]
+    r = np.sqrt(xsat**2 + ysat**2 + zsat**2)
+    corg = (x[0]*xsat + x[1]*ysat + x[2]*zsat) / r
+
+    dif['C1_corr'] = dif['C1'] - corg
+    dif['P1_corr'] = dif['P1'] - corg
+    dif['P2_corr'] = dif['P2'] - corg
+
+    dif = dif.rename(columns={'MJD_bin': 'MJD'})
+    
+    # Keep only relevant columns
+    
+    return dif[['MJD', 'sv', 'X', 'Y', 'Z', 'elevation', 'C1', 'P1', 'P2', 'P1-P2', 'C1_corr', 'P1_corr', 'P2_corr']]
+
 
 
 def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
@@ -429,7 +508,7 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     file_sum = open('./outputs/' + filename + '_results.txt', 'w')
     
     file_sum.write(
-    f" SIM_GNSS_cal Version: {VERSION}\n"
+    f" GNSS_cal_tools Version: {VERSION}\n"
     f"Processing date and time: {st} UTC-3\n"
     f"Output interval (s) = {config['intcod']}\n"
     f"Code threshold (ns) = {config['ithr']}\n"
@@ -488,12 +567,12 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     pop1 = dif.groupby(['MJD']).median()
 
     rawdiff = {
-        'medianC1' : round(pop1['C1_corr'].median()/0.299792458, 1),
-        'stdC1' : round(pop1['C1_corr'].std()/0.299792458, 1),
-        'medianP1' : round(pop1['P1_corr'].median()/0.299792458, 1),
-        'stdP1' : round(pop1['P1_corr'].std()/0.299792458, 1),
-        'medianP2' : round(pop1['P2_corr'].median()/0.299792458, 1),
-        'stdP2' : round(pop1['P2_corr'].std()/0.299792458, 1)
+        'medianC1' : round(pop1['C1_corr'].median()/0.299792458, 2),
+        'stdC1' : round(pop1['C1_corr'].std()/0.299792458, 2),
+        'medianP1' : round(pop1['P1_corr'].median()/0.299792458, 2),
+        'stdP1' : round(pop1['P1_corr'].std()/0.299792458, 2),
+        'medianP2' : round(pop1['P2_corr'].median()/0.299792458, 2),
+        'stdP2' : round(pop1['P2_corr'].std()/0.299792458, 2)
         }
 
 
@@ -606,8 +685,9 @@ def ElevationReject(dfSTA,pos,config,name):
     return(dfSTA)
 
 def C1P1(sta,df_sta):
-    sta['c1p1_bias_median'] = (df_sta['C1'] - df_sta['P1']).median()
-    sta['c1p1_bias_std'] = (df_sta['C1'] - df_sta['P1']).std()    
+    c1p1_diff = df_sta['C1'] - df_sta['P1']
+    sta['c1p1_bias_median'] = c1p1_diff.median()
+    sta['c1p1_bias_std'] = c1p1_diff.std()  
     return(sta)
 
 def OExyz(dfnav_first,dfSTA):

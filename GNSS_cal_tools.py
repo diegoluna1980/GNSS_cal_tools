@@ -101,4 +101,4 @@ figures(dif, config, ts)
 
 # Stop time
 stop_time = time.time()
-print(f"Tiempo de ejecución: {stop_time - start_time:.4f} segundos")
+print(f"Execution time: {stop_time - start_time:.4f} seconds")

@@ -508,7 +508,7 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     file_sum = open('./outputs/' + filename + '_results.txt', 'w')
     
     file_sum.write(
-    f" SIM_GNSS_cal Version: {VERSION}\n"
+    f" GNSS_cal_tools Version: {VERSION}\n"
     f"Processing date and time: {st} UTC-3\n"
     f"Output interval (s) = {config['intcod']}\n"
     f"Code threshold (ns) = {config['ithr']}\n"
@@ -567,12 +567,12 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     pop1 = dif.groupby(['MJD']).median()
 
     rawdiff = {
-        'medianC1' : round(pop1['C1_corr'].median()/0.299792458, 1),
-        'stdC1' : round(pop1['C1_corr'].std()/0.299792458, 1),
-        'medianP1' : round(pop1['P1_corr'].median()/0.299792458, 1),
-        'stdP1' : round(pop1['P1_corr'].std()/0.299792458, 1),
-        'medianP2' : round(pop1['P2_corr'].median()/0.299792458, 1),
-        'stdP2' : round(pop1['P2_corr'].std()/0.299792458, 1)
+        'medianC1' : round(pop1['C1_corr'].median()/0.299792458, 2),
+        'stdC1' : round(pop1['C1_corr'].std()/0.299792458, 2),
+        'medianP1' : round(pop1['P1_corr'].median()/0.299792458, 2),
+        'stdP1' : round(pop1['P1_corr'].std()/0.299792458, 2),
+        'medianP2' : round(pop1['P2_corr'].median()/0.299792458, 2),
+        'stdP2' : round(pop1['P2_corr'].std()/0.299792458, 2)
         }
 
 
