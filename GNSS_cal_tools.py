@@ -97,7 +97,7 @@ if config['calculate_delays']:
     delays_b = calibration(rawdiff, delays_a, delays_b, sta_a, sta_b)
 
 # Figure Outputs
-figures(dif, config, ts)
+figures(dif, config, ts, sta_a, sta_b)
 
 # Stop time
 stop_time = time.time()

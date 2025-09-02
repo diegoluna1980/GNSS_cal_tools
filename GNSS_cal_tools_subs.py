@@ -116,7 +116,7 @@ def loader(file,config):
             dataset = gr.load(file, use=config['SYS'], meas=['C1', 'P1', 'P2'])
     return(dataset)
 
-def figures(dif,config,ts):
+def figures(dif,config,ts, sta_a, sta_b):
     
     """
     Generates plots of time series and time deviations (TDEV) 
@@ -238,7 +238,7 @@ def figures(dif,config,ts):
         
         # Global title and save
         plt.suptitle('C1, P1, and P2 plots - GNSS_cal_tools.py', fontsize=16,  fontweight='bold')
-        destino = './outputs/C1P1P2plotsGNSS_cal_tools.pdf'
+        destino = './outputs/C1P1P2plots_' + sta_a.filename + '_' + sta_b.filename + '.pdf'       
         fig1.savefig(destino,facecolor='0.9', dpi = 200)
         plt.close()
 
