@@ -594,6 +594,9 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     cols_a_exportar = dif[['MJD','sv', 'C1_corr', 'P1_corr', 'P2_corr']].copy()
     cols_a_exportar.columns = ['MJD', 'sv', 'C1', 'P1', 'P2']
+    cols_a_exportar['C1'] = cols_a_exportar['C1']/0.299792458
+    cols_a_exportar['P1'] = cols_a_exportar['P1']/0.299792458
+    cols_a_exportar['P2'] = cols_a_exportar['P2']/0.299792458
     cols_a_exportar['MJD'] = cols_a_exportar['MJD'].map(lambda x: f"{x:.5f}")
     cols_a_exportar['C1']  = cols_a_exportar['C1'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['P1']  = cols_a_exportar['P1'].map(lambda x: f"{x:.2f}")
