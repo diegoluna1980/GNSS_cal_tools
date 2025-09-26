@@ -16,7 +16,8 @@ from conf import (config, file_a, file_b, file_nav, pos_a, pos_b, delays_a,
 
 from GNSS_cal_tools_subs import (
     OExyz, dfSTAgen, dfNAVgen, C1P1, outputs,
-    ElevationReject, DIFgen, figures, loader, calibration, DIFgen1
+    ElevationReject, DIFgen, figures, loader, calibration, DIFgen1,
+    APOcorrection
 )
 
 # Limitations:
@@ -45,15 +46,19 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 # Loading data from files
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
       ': Loading NAV and OBS files')
-nav = loader(file_nav, config)
-sta_a = loader(file_a, config)
-sta_b = loader(file_b, config)
+nav, nav_hdr = loader(file_nav, config)
+sta_a, sta_a_hdr = loader(file_a, config)
+sta_b, sta_b_hdr = loader(file_b, config)
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE\n')
 
 # Generation of dataframes
 df_sta_a = dfSTAgen(sta_a)
 df_sta_b = dfSTAgen(sta_b)
 dfnav = dfNAVgen(nav)
+
+# Apply Antanna Phase offsets correction
+#pos_a = APOcorrection(pos_a,sta_a_hdr)
+#pos_b = APOcorrection(pos_b,sta_b_hdr)
 
 # Positions, distance and interval
 x = pos_b - pos_a

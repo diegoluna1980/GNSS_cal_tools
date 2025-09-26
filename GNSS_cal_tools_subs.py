@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import datetime
 import allantools
 import georinex as gr
-
+from pyproj import CRS, Transformer
 
 # =============================================================================
 #  Define constants
@@ -26,6 +26,34 @@ MU = 3.9860050e14
 
 # OMEGAE - WGS84 value of the Earth's rotation rate in rad/sec
 OMEGAE = 7.292115e-5
+
+def APOcorrection(pos,sta_hdr):
+    
+    # Define transformations
+    crs_ecef = CRS.from_epsg(4978)   # ECEF (WGS84)
+    crs_geo  = CRS.from_epsg(4979)   # Geodetic lat/lon/ellipsoidal height (WGS84)
+    transformer = Transformer.from_crs(crs_ecef, crs_geo, always_xy=True)
+    lon, lat, h = transformer.transform(pos[0], pos[1],pos[2])
+
+    APO_str = sta_hdr['ANTENNA: DELTA H/E/N']
+    
+    # Phase center offset (ENU frame - adjust for your antenna)
+    u_offset, e_offset, n_offset = [float(x) for x in APO_str.split() if x]
+
+    # Convert to radians
+    lat_rad, lon_rad = np.radians(lat), np.radians(lon)
+
+    # ENU to ECEF rotation matrix
+    sin_lat, cos_lat = np.sin(lat_rad), np.cos(lat_rad)
+    sin_lon, cos_lon = np.sin(lon_rad), np.cos(lon_rad)
+
+    # Convert offset to ECEF
+    dx = -sin_lon * e_offset - sin_lat * cos_lon * n_offset + cos_lat * cos_lon * u_offset
+    dy = cos_lon * e_offset - sin_lat * sin_lon * n_offset + cos_lat * sin_lon * u_offset
+    dz = cos_lat * n_offset + sin_lat * u_offset
+    
+    pos = pos + [dx,dy,dz]
+    return(pos)
 
 def calibration(rawdiff, delays_a, delays_b, sta_a, sta_b):
     
@@ -114,7 +142,7 @@ def loader(file,config):
             dataset = dataset.rename({"C2W": "P2"})
         else:
             dataset = gr.load(file, use=config['SYS'], meas=['C1', 'P1', 'P2'])
-    return(dataset)
+    return(dataset, file_hdr)
 
 def figures(dif,config,ts, sta_a, sta_b):
     
