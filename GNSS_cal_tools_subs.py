@@ -37,7 +37,7 @@ def APOcorrection(pos,sta_hdr):
 
     APO_str = sta_hdr['ANTENNA: DELTA H/E/N']
     
-    # Phase center offset (ENU frame - adjust for your antenna)
+    # Phase center offset (ENU frame)
     u_offset, e_offset, n_offset = [float(x) for x in APO_str.split() if x]
 
     # Convert to radians
@@ -490,7 +490,6 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
     Xc = dif['C1'].median()
     S=1.4826*np.median(np.abs(dif['C1']-Xc))
     dif['C1-Xc'] = dif['C1']-Xc
-    dif = dif[(dif[['C1-Xc']].abs() <= u*S).all(axis=1)]
 
     Xc = dif['P1'].median()
     S=1.4826*np.median(np.abs(dif['P1']-Xc))
@@ -672,6 +671,27 @@ def ElevationReject(dfSTA,pos,config,name):
     # Convert to degrees and store in DataFrame    
     dfSTA['elevation'] = np.arcsin(sinelv)*180/np.pi
 
+    # Compute azimuth angle (degrees)
+    # azimuth = arctan2(East, North) in local ENU coordinates
+    # Convert (X,Y,Z) -> local (E,N,U)
+    # Assuming observer position defines Up = pos / |pos|
+    lat = np.arctan2(zsta, np.sqrt(xsta**2 + ysta**2))
+    lon = np.arctan2(ysta, xsta)
+
+    # Rotation matrix ECEF -> ENU
+    sin_lat, cos_lat = np.sin(lat), np.cos(lat)
+    sin_lon, cos_lon = np.sin(lon), np.cos(lon)
+    R = np.array([[-sin_lon,             cos_lon,              0],
+                  [-sin_lat*cos_lon, -sin_lat*sin_lon, cos_lat],
+                  [ cos_lat*cos_lon,  cos_lat*sin_lon, sin_lat]])
+
+    rel_xyz = np.vstack((xsat, ysat, zsat))
+    enu = R @ rel_xyz
+    E, N, U = enu[0, :], enu[1, :], enu[2, :]
+
+    dfSTA['azimuth'] = (np.degrees(np.arctan2(E, N)) + 360) % 360
+
+
     # Count and filter out low-elevation satellites    
     low_elevations = (dfSTA['elevation'] < ielmin).sum()
     dfSTA = dfSTA[dfSTA['elevation'] >= ielmin]
@@ -712,7 +732,26 @@ def ElevationReject(dfSTA,pos,config,name):
         # Save image and show plot
         plt.savefig('./outputs/Elevation_' + name + 'histogram.pdf', dpi=300,
                     bbox_inches='tight')
-        plt.show()    
+        plt.show()
+        
+        
+        plt.figure(figsize=(8, 8), dpi=300, facecolor='white')
+        ax = plt.subplot(111, polar=True)
+        ax.set_theta_zero_location('N')  # 0° at North
+        ax.set_theta_direction(-1)       # Clockwise
+        theta = np.radians(dfSTA['azimuth'])
+        r = dfSTA['elevation']      # Elevation from zenith
+        ax.scatter(theta, r, s=1)
+        #ax.scatter(theta, r, c=dfSTA['elevation'], cmap='viridis', s=40, edgecolors='k')
+        ax.set_rlim(90, 0)
+        ax.set_rlabel_position(135)
+        ax.set_title(f'{name} – Skyplot', va='bottom', fontweight='bold')
+        plt.savefig(f'./outputs/Skyplot_{name}.pdf', dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        
+        
+        
     return(dfSTA)
 
 def C1P1(sta,df_sta):
@@ -721,7 +760,7 @@ def C1P1(sta,df_sta):
     sta['c1p1_bias_std'] = c1p1_diff.std()  
     return(sta)
 
-def OExyz(dfnav_first,dfSTA):
+def OExyz(dfnav_first, dfSTA, stafilename):
     
     """
      Computes satellite positions in Earth-Centered, Earth-Fixed (ECEF) coordinates 
@@ -852,6 +891,14 @@ def OExyz(dfnav_first,dfSTA):
     dfSTA['Y'] = Y
     dfSTA['Z'] = Z
     
+    
+    # Remove unhealthy satellites
+    unhealthy_count = sum(dfSTA['health'] != 0)
+    healthy_count = sum(dfSTA['health'] == 0)
+    print(f'Unhealthy sats in {stafilename}: {unhealthy_count}/{healthy_count}')
+
+    dfSTA = dfSTA[dfSTA['health'] == 0]
+
     return(dfSTA)
 
 
@@ -859,6 +906,11 @@ def dfSTAgen(STA):
     # Generation of dataframes
     dfSTA = STA.to_dataframe()
     
+    #print(dfSTA.columns)
+    #Remove unhealthy satellites
+    #print('Unhealthy satellites: ' + str(sum(dfSTA['health'] != 0)))
+    #dfSTA = dfSTA[dfSTA['health'] == 0]
+
     # Removing rows with only NANs from dataframes
     dfSTA = dfSTA.dropna(how='all')
     
@@ -869,7 +921,7 @@ def dfSTAgen(STA):
     dfSTA['time'] = pd.to_datetime(dfSTA['time'])
     pop = dfSTA['time'].dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
     dfSTA['MJD'] = Time(pop).mjd
-    
+        
     return(dfSTA)
 
 def dfNAVgen(nav):

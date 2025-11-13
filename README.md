@@ -21,7 +21,7 @@ Measurements have to be performed in a common-clock / zero-baseline configuratio
 ## Dependencies
 
 ```python
-pandas numpy matplotlib georinex allantools
+pandas numpy matplotlib georinex allantools pyproj
 ```
 
 ## Features
@@ -135,7 +135,7 @@ python GNSS_calibration_transfer.py
 
 - GNSS_cal_tools has been tested only on 30 seconds of observation interval.
 
-- Only tested with GPS data
+- Tested with GPS and Galileo data
 
 - Does not support LZ files (cases with different references)
 
