@@ -27,6 +27,108 @@ MU = 3.9860050e14
 # OMEGAE - WGS84 value of the Earth's rotation rate in rad/sec
 OMEGAE = 7.292115e-5
 
+def multipath(dfSTA,config,sta,st):
+    
+    """
+    Calculate multipath error for GPS L1 observations.
+    
+    Uses linear combination of code and phase observables to isolate multipath effects
+    by eliminating geometric, ionospheric, and clock terms.
+    
+    https://ieeexplore.ieee.org/document/8316317
+    https://www.nature.com/articles/s44172-025-00355-z
+    
+    Parameters:
+    -----------
+    dfSTA : DataFrame
+        DataFrame containing RINEX observations for a station.
+        Must include columns: 'C1', 'P1', 'P2' (pseudoranges on L1, P1 and P2)
+    config : dict
+        Configuration dictionary with processing parameters.
+        Must contain: 'plot_mp_errors' (bool) and 'SYS' (GNSS system)
+    
+    Returns:
+    --------
+    DataFrame
+        Original DataFrame with additional 'MP1' column containing
+        multipath error in nanoseconds
+    """
+       
+    
+    if config['plot_mp_errors']:    
+        if config['SYS'] == 'G':
+            # Constantes GPS            
+            f1, f2 = 1575.42e6, 1227.60e6  # Hz
+            c = 299792458 # m/s
+            l1 = c / f1 # wavelength L1 in m
+            l2 = c / f2 # wavelength L2 in m
+            
+            alpha = (f1/f2)**2
+            K1 = 1 + 2/(alpha - 1)  # 4.091
+            K2 = 2/(alpha - 1)      # 3.091
+            
+            # Corrects phase slips
+            dfSTA['GF'] = dfSTA['L1C']*l1 - dfSTA['L2W']*l2
+            dfSTA['GF_diff'] = dfSTA.groupby('sv')['GF'].diff().abs()
+            
+            # slip if GF over 0.05 m 
+            slip_threshold = l1 / 4
+            dfSTA['slip'] = dfSTA['GF_diff'] > slip_threshold
+            
+            # Create Segment
+            dfSTA['segment'] = dfSTA.groupby('sv')['slip'].cumsum()
+            
+            # Calculate MP1
+            dfSTA['MP1'] = dfSTA['C1'] - K1*dfSTA['L1C']*l1 + K2*dfSTA['L2W']*l2
+
+            # Corregir ambiguity by segment
+            dfSTA['MP1_corr'] = dfSTA.groupby(['sv','segment'])['MP1'].transform(
+                                lambda x: x - x.mean()  )
+                        
+            # Convert from meters to ns
+            dfSTA['MP1_corr'] = dfSTA['MP1_corr'] * 3.33564095 
+
+            #Figure
+            plt.figure(figsize=(12, 8), dpi=200, facecolor='white')
+            plt.plot(dfSTA['MJD'],dfSTA['MP1_corr'],'k.')
+            plt.figtext(.92, 0.4,  'Computed at: ' + st + ' UTC-3\n', rotation=90)    
+            plt.ylabel('Multipath Error / ns', size = 14)
+            plt.xlabel('MJD', size = 14)
+            plt.grid()
+            plt.ylim([-5,5])
+            plt.savefig(f'./outputs/MultipathError_{sta.filename}.png', dpi=100, bbox_inches='tight',facecolor='0.9')
+            plt.close()
+            
+            # Figure
+            plt.figure(figsize=(12, 8), dpi=200, facecolor='white')
+            plt.plot(dfSTA['elevation'],dfSTA['MP1_corr'],'k.')
+            plt.figtext(.92, 0.4,  'Computed at: ' + st + ' UTC-3\n', rotation=90)    
+            plt.ylabel('Multipath Error / ns', size = 14)
+            plt.xlabel('Elevation / degrees', size = 14)
+            plt.grid()
+            plt.ylim([-5,5])
+            plt.savefig(f'./outputs/MultipathError_{sta.filename}_vs_elevation.png', dpi=100, bbox_inches='tight',facecolor='0.9')
+
+            #Figure
+            plt.figure(figsize=(12, 8), dpi=200, facecolor='white')
+            #dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].plot.hist(bins=30, alpha=0.7)
+            dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].plot.hist(bins=30, figsize=(10, 6),alpha=0.7)
+            plt.figtext(.92, 0.1,  'Computed at: ' + st + ' UTC-3\n', rotation=90)    
+            plt.ylabel('Occurrence', size = 14)
+            plt.xlabel('Multipath Error / ns', size = 14)
+            plt.grid()
+            plt.savefig(f'./outputs/MultipathError_{sta.filename}_histogram.png', dpi=100, bbox_inches='tight',facecolor='0.9')
+
+            MP1_mean = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].mean()
+            MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
+
+            sta['MP1_mean'] = float(MP1_mean)
+            sta['MP1_std'] = float(MP1_std)
+
+    return (dfSTA, sta)
+
+
+
 def APOcorrection(pos,sta_hdr):
     
     # Define transformations
@@ -110,6 +212,10 @@ def calibration(rawdiff, delays_a, delays_b, sta_a, sta_b):
     
     return(delays_b)
 
+
+
+    
+    
 def loader(file,config):
     """
     Reads a RINEX file (version 2 or 3) and returns the dataset.
@@ -135,8 +241,10 @@ def loader(file,config):
     
     if (file_hdr['filetype'] == 'O'):
         if (file_hdr['version'] > 3):
+            #dataset = gr.load(file, use=config['SYS'],
+            #                   meas=['C1C', 'C1W', 'C2W'])
             dataset = gr.load(file, use=config['SYS'],
-                              meas=['C1C', 'C1W', 'C2W'])
+                               meas=['C1C', 'C1W', 'C2W','L2W','L1C'])
             dataset = dataset.rename({"C1C": "C1"})
             dataset = dataset.rename({"C1W": "P1"})
             dataset = dataset.rename({"C2W": "P2"})
@@ -159,7 +267,7 @@ def figures(dif,config,ts, sta_a, sta_b):
     
     if config['timeplots']:
 
-        # Conversion factor from kilometers to nanoseconds
+        # Conversion factor from meters to nanoseconds
         k = 0.299792458
         
         # List of unique Modified Julian Dates (MJD)
@@ -168,7 +276,7 @@ def figures(dif,config,ts, sta_a, sta_b):
         # Group data by MJD and compute median values
         pop1 = dif.groupby(['MJD']).median()
         
-        # Convert median corrected values from km to ns
+        # Convert median corrected values from m to ns
         C1 = pop1['C1_corr'].to_numpy() / k
         P1 = pop1['P1_corr'].to_numpy() / k
         P2 = pop1['P2_corr'].to_numpy() / k
@@ -188,7 +296,7 @@ def figures(dif,config,ts, sta_a, sta_b):
         # Plot time series for C1        
         plt.subplot(231)
         plt.plot(MJD, C1, 'b.',markeredgewidth=0.0,zorder=4,label='C1')
-        plt.title('Median: (' + str(round(np.median(C1),1)) + '+/-' + str(round(C1.std(),1)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(C1),2)) + '+/-' + str(round(C1.std(),2)) + ') ns')
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.ylabel('Time / ns', size = 14)
         plt.xlabel('MJD', size = 14)
@@ -204,7 +312,7 @@ def figures(dif,config,ts, sta_a, sta_b):
         # Plot time series for P1
         plt.subplot(232)
         plt.plot(MJD, P1, 'b.',markeredgewidth=0.0,zorder=4,label='P1')
-        plt.title('Median: (' + str(round(np.median(P1),1)) + '+/-' + str(round(P1.std(),1)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(P1),2)) + '+/-' + str(round(P1.std(),2)) + ') ns')
         plt.xlabel('MJD', size = 14)
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.grid(linestyle='dashed')
@@ -219,7 +327,7 @@ def figures(dif,config,ts, sta_a, sta_b):
         # Plot time series for P2
         plt.subplot(233)
         plt.plot(MJD, P2, 'b.',markeredgewidth=0.0,zorder=4,label='P2')
-        plt.title('Median: (' + str(round(np.median(P2),1)) + '+/-' + str(round(P2.std(),1)) + ') ns')
+        plt.title('Median: (' + str(round(np.median(P2),2)) + '+/-' + str(round(P2.std(),2)) + ') ns')
         plt.xlabel('MJD', size = 14)
         plt.legend(loc=0, prop={'size': 12}, framealpha=1)
         plt.grid(linestyle='dashed')
@@ -269,6 +377,8 @@ def figures(dif,config,ts, sta_a, sta_b):
         destino = './outputs/C1P1P2plots_' + sta_a.filename + '_' + sta_b.filename + '.pdf'       
         fig1.savefig(destino,facecolor='0.9', dpi = 200)
         plt.close()
+        
+        
 
 def DIFgen1(dfSTA1, dfSTA2, config, pos1, pos2):
     """
@@ -490,6 +600,7 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
     Xc = dif['C1'].median()
     S=1.4826*np.median(np.abs(dif['C1']-Xc))
     dif['C1-Xc'] = dif['C1']-Xc
+    dif = dif[(dif[['C1-Xc']].abs() <= u*S).all(axis=1)]
 
     Xc = dif['P1'].median()
     S=1.4826*np.median(np.abs(dif['P1']-Xc))
@@ -515,6 +626,7 @@ def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
     xsat =  dif['X'].to_numpy() - xsta
     ysat =  dif['Y'].to_numpy() - ysta
     zsat =  dif['Z'].to_numpy() - zsta
+
     r = np.sqrt(xsat**2+ysat**2+zsat**2) # 1664 in dclrinex
     
     # Projection of baseline onto satellite line-of-sight    
@@ -591,7 +703,18 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         f"{round(sta2['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
     )
 
+    print(
+        f"Mean and stdev of L1 Multipath Error in {sta1.filename}: "
+        f"({round(float(sta1.MP1_mean), 2)} +/- "
+        f"{round(float(sta1.MP1_std), 2)}) ns\n"
+        f"Mean and stdev of L1 Multipath Error in {sta2.filename}: "
+        f"({round(float(sta2.MP1_mean), 2)} +/- "
+        f"{round(float(sta2.MP1_std), 2)}) ns\n"
+            )
+
+
     pop1 = dif.groupby(['MJD']).median()
+
 
     rawdiff = {
         'medianC1' : round(pop1['C1_corr'].median()/0.299792458, 2),
@@ -633,7 +756,7 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     return(rawdiff)
 
-def ElevationReject(dfSTA,pos,config,name):
+def ElevationReject(dfSTA,pos,config,name,st):
     """
     Filters satellite data based on elevation angle and optionally plots an elevation histogram.
     
@@ -670,6 +793,7 @@ def ElevationReject(dfSTA,pos,config,name):
     
     # Convert to degrees and store in DataFrame    
     dfSTA['elevation'] = np.arcsin(sinelv)*180/np.pi
+    
 
     # Compute azimuth angle (degrees)
     # azimuth = arctan2(East, North) in local ENU coordinates
@@ -705,7 +829,7 @@ def ElevationReject(dfSTA,pos,config,name):
     if config['plotelevations']:
         
         # Set up the figure 
-        plt.figure(figsize=(10, 6), dpi=300)  # High resolution
+        plt.figure(figsize=(12, 8), dpi=200)  # High resolution
         sns.set_style("white")  # Clean background
         sns.set_context("paper", font_scale=1.4)
 
@@ -729,25 +853,37 @@ def ElevationReject(dfSTA,pos,config,name):
         plt.grid(axis='x', alpha=0.1)
         plt.tight_layout()
 
+
+        # Add timestamp to right margin
+        plt.figtext(0.99, 0.5,  'Computed at: ' + st + ' UTC-3\n', rotation=90)
+
+
+
         # Save image and show plot
-        plt.savefig('./outputs/Elevation_' + name + 'histogram.pdf', dpi=300,
-                    bbox_inches='tight')
-        plt.show()
+        plt.savefig('./outputs/Elevation_' + name + 'histogram.pdf', dpi=200,
+                    bbox_inches='tight',facecolor='0.9')
+        #plt.show()
+        plt.close()
         
-        
-        plt.figure(figsize=(8, 8), dpi=300, facecolor='white')
-        ax = plt.subplot(111, polar=True)
+        plt.figure(figsize=(12, 8), dpi=200, facecolor='white')
+
+        # Add timestamp to right margin
+        plt.figtext(0.8, 0.4,  'Computed at: ' + st + ' UTC-3\n', rotation=90)
+
+        ax = plt.subplot(111, polar=True, label = config['SYS'])
         ax.set_theta_zero_location('N')  # 0° at North
         ax.set_theta_direction(-1)       # Clockwise
         theta = np.radians(dfSTA['azimuth'])
         r = dfSTA['elevation']      # Elevation from zenith
         ax.scatter(theta, r, s=1)
-        #ax.scatter(theta, r, c=dfSTA['elevation'], cmap='viridis', s=40, edgecolors='k')
+        #ax.scatter(theta, r, c=dfSTA['MP1'], cmap='viridis', s=1)
         ax.set_rlim(90, 0)
-        ax.set_rlabel_position(135)
+        ax.set_rlabel_position(180)
         ax.set_title(f'{name} – Skyplot', va='bottom', fontweight='bold')
-        plt.savefig(f'./outputs/Skyplot_{name}.pdf', dpi=300, bbox_inches='tight')
-        plt.show()
+        plt.savefig(f'./outputs/Skyplot_{name}.png', dpi=100, bbox_inches='tight',facecolor='0.9')
+        #plt.show()
+        plt.close()
+
         
         
         
@@ -895,7 +1031,7 @@ def OExyz(dfnav_first, dfSTA, stafilename):
     # Remove unhealthy satellites
     unhealthy_count = sum(dfSTA['health'] != 0)
     healthy_count = sum(dfSTA['health'] == 0)
-    print(f'Unhealthy sats in {stafilename}: {unhealthy_count}/{healthy_count}')
+    print(f'Unhealthy/healthy sats in {stafilename}: {unhealthy_count}/{healthy_count}')
 
     dfSTA = dfSTA[dfSTA['health'] == 0]
 
@@ -906,11 +1042,6 @@ def dfSTAgen(STA):
     # Generation of dataframes
     dfSTA = STA.to_dataframe()
     
-    #print(dfSTA.columns)
-    #Remove unhealthy satellites
-    #print('Unhealthy satellites: ' + str(sum(dfSTA['health'] != 0)))
-    #dfSTA = dfSTA[dfSTA['health'] == 0]
-
     # Removing rows with only NANs from dataframes
     dfSTA = dfSTA.dropna(how='all')
     
@@ -927,12 +1058,21 @@ def dfSTAgen(STA):
 def dfNAVgen(nav):
     # Generation of dataframes
     dfnav = nav.to_dataframe()
-    
+
     # Removing rows with only NANs from dataframes
     dfnav = dfnav.dropna(how='all')
     
     # Resetting indexes
     dfnav = dfnav.reset_index()
+    
+    # Remove unhealthy satellites
+    unhealthy_count = sum(dfnav['health'] != 0)
+    healthy_count = sum(dfnav['health'] == 0)
+    dfnav = dfnav[dfnav['health'] == 0]
+    print(f'Unhealthy/healthy sats in {nav.filename}: {unhealthy_count}/{healthy_count}')
+
+    #Remove satellites with clock drift bigger than 1e-11
+    #dfnav = dfnav[np.abs(dfnav['SVclockDrift']) <= 1e-11]
     
     #Adding MJD columns
     dfnav['time'] = pd.to_datetime(dfnav['time'])
