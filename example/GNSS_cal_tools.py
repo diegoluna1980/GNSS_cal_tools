@@ -16,13 +16,13 @@ from conf import (config, file_a, file_b, file_nav, pos_a, pos_b, delays_a,
 
 from GNSS_cal_tools_subs import (
     OExyz, dfSTAgen, dfNAVgen, C1P1, outputs,
-    ElevationReject, DIFgen, figures, loader, calibration, DIFgen1
+    ElevationReject, figures, loader, calibration, DIFgen1,
+    APOcorrection, multipath
 )
 
 # Limitations:
 # Only one RINEX file per station
 # No LZ files (the case when the two receivers don't have the same reference)
-# Tested only for GPS
 
 # Start time
 start_time = time.time()
@@ -45,9 +45,9 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 # Loading data from files
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
       ': Loading NAV and OBS files')
-nav = loader(file_nav, config)
-sta_a = loader(file_a, config)
-sta_b = loader(file_b, config)
+nav, nav_hdr = loader(file_nav, config)
+sta_a, sta_a_hdr = loader(file_a, config)
+sta_b, sta_b_hdr = loader(file_b, config)
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE\n')
 
 # Generation of dataframes
@@ -55,38 +55,44 @@ df_sta_a = dfSTAgen(sta_a)
 df_sta_b = dfSTAgen(sta_b)
 dfnav = dfNAVgen(nav)
 
+# Apply Antenna Phase offsets correction of RECEIVER
+pos_a = APOcorrection(pos_a,sta_a_hdr)
+pos_b = APOcorrection(pos_b,sta_b_hdr)
+
 # Positions, distance and interval
 x = pos_b - pos_a
 dist = np.linalg.norm(x)
 
 # Create a reduced dataframe of ephemeris, with only one entry per sat, per day
 # Keep first non-NAN entrance of each sv:
-
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
-      ': Creation of dataframe for epehemeris')    
 first_occurrence_idx = dfnav.groupby('sv').apply(lambda x: x.index[0])
 dfnav_first = dfnav.loc[first_occurrence_idx]
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE')
 
 
 # Adding of EARTH FIXED COORDINATES (subroutine OExyz of dclrinex)
-df_sta_a = OExyz(dfnav_first, df_sta_a)
-df_sta_b = OExyz(dfnav_first, df_sta_b)
+# and removing unhealthy satellites
+df_sta_a = OExyz(dfnav_first, df_sta_a, sta_a.filename)
+df_sta_b = OExyz(dfnav_first, df_sta_b, sta_b.filename)
+
 
 # Rejection at low elevation (line 1554 of dclrinex)
-df_sta_a = ElevationReject(df_sta_a, pos_a, config, sta_a.filename)
-df_sta_b = ElevationReject(df_sta_b, pos_b, config, sta_b.filename)
+df_sta_a = ElevationReject(df_sta_a, pos_a, config, sta_a.filename, st)
+df_sta_b = ElevationReject(df_sta_b, pos_b, config, sta_b.filename, st)
+
+#Add Multipath Error estimation https://ieeexplore.ieee.org/document/8316317
+# https://www.nature.com/articles/s44172-025-00355-z
+df_sta_a, sta_a = multipath(df_sta_a, config, sta_a, st)
+df_sta_b, sta_b = multipath(df_sta_b, config, sta_b, st)
+
 
 # Add C1P1 bias
 sta_a = C1P1(sta_a,df_sta_a)
 sta_b = C1P1(sta_b,df_sta_b)
 
-
 # Genero diferencias
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
       ': Creation of dataframe of time differences')  
 dif = DIFgen1(df_sta_a, df_sta_b, config, pos_a, pos_b)
-#dif = DIFgen(df_sta_a, df_sta_b, config, pos_a, pos_b)
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE\n')
 
 # Text Outputs and rawdif calculation. rawdiff = a - b
@@ -97,8 +103,10 @@ if config['calculate_delays']:
     delays_b = calibration(rawdiff, delays_a, delays_b, sta_a, sta_b)
 
 # Figure Outputs
-figures(dif, config, ts)
+figures(dif, config, ts, sta_a, sta_b)
 
 # Stop time
 stop_time = time.time()
 print(f"Execution time: {stop_time - start_time:.4f} seconds")
+
+

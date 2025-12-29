@@ -87,38 +87,64 @@ def multipath(dfSTA,config,sta,st):
                         
             # Convert from meters to ns
             dfSTA['MP1_corr'] = dfSTA['MP1_corr'] * 3.33564095 
-
-            #Figure
-            plt.figure(figsize=(12, 8), dpi=200, facecolor='white')
-            plt.plot(dfSTA['MJD'],dfSTA['MP1_corr'],'k.')
-            plt.figtext(.92, 0.4,  'Computed at: ' + st + ' UTC-3\n', rotation=90)    
-            plt.ylabel('Multipath Error / ns', size = 14)
-            plt.xlabel('MJD', size = 14)
-            plt.grid()
-            plt.ylim([-5,5])
-            plt.savefig(f'./outputs/MultipathError_{sta.filename}.png', dpi=100, bbox_inches='tight',facecolor='0.9')
-            plt.close()
             
-            # Figure
-            plt.figure(figsize=(12, 8), dpi=200, facecolor='white')
-            plt.plot(dfSTA['elevation'],dfSTA['MP1_corr'],'k.')
-            plt.figtext(.92, 0.4,  'Computed at: ' + st + ' UTC-3\n', rotation=90)    
-            plt.ylabel('Multipath Error / ns', size = 14)
-            plt.xlabel('Elevation / degrees', size = 14)
-            plt.grid()
-            plt.ylim([-5,5])
-            plt.savefig(f'./outputs/MultipathError_{sta.filename}_vs_elevation.png', dpi=100, bbox_inches='tight',facecolor='0.9')
+            # Crear figura y ejes
+            fig, axs = plt.subplots(
+                nrows=1,
+                ncols=3,
+                figsize=(18, 5),
+                dpi=200,
+                facecolor='white'
+            )
+            
+            # --- Subplot 1: MP1_corr vs MJD ---
+            axs[0].plot(dfSTA['MJD'], dfSTA['MP1_corr'], 'k.')
+            axs[0].set_xlabel('MJD', fontsize=14)
+            axs[0].set_ylabel('Multipath Error / ns', fontsize=14)
+            axs[0].set_ylim([-5, 5])
+            axs[0].grid(True)
+            
+            # --- Subplot 2: MP1_corr vs Elevation ---
+            axs[1].plot(dfSTA['elevation'], dfSTA['MP1_corr'], 'k.')
+            axs[1].set_xlabel('Elevation / degrees', fontsize=14)
+            axs[1].set_ylabel('Multipath Error / ns', fontsize=14)
+            axs[1].set_ylim([-5, 5])
+            axs[1].grid(True)
+            
+            # --- Subplot 3: Histograma ---
+            axs[2].hist(
+                dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'],
+                bins=30,
+                alpha=0.7
+            )
+            axs[2].set_xlabel('Multipath Error / ns', fontsize=14)
+            axs[2].set_ylabel('Occurrence', fontsize=14)
+            axs[2].grid(True)
+            
+            # Texto común lateral
+            fig.text(
+                0.98, 0.5,
+                f'GNSS_cal_tools \n Computed at: {st} UTC-3',
+                rotation=90,
+                va='center',
+                ha='right',
+                fontweight="bold"
+            )
+            
+            # Ajuste de layout
+            fig.tight_layout(rect=[0, 0, 0.95, 1])
+            
+            # Guardar figura
+            fig.savefig(
+                f'./outputs/MultipathError_{sta.filename}.jpg',
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='0.9'
+            )
+            
+            plt.close(fig)
 
-            #Figure
-            plt.figure(figsize=(12, 8), dpi=200, facecolor='white')
-            #dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].plot.hist(bins=30, alpha=0.7)
-            dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].plot.hist(bins=30, figsize=(10, 6),alpha=0.7)
-            plt.figtext(.92, 0.1,  'Computed at: ' + st + ' UTC-3\n', rotation=90)    
-            plt.ylabel('Occurrence', size = 14)
-            plt.xlabel('Multipath Error / ns', size = 14)
-            plt.grid()
-            plt.savefig(f'./outputs/MultipathError_{sta.filename}_histogram.png', dpi=100, bbox_inches='tight',facecolor='0.9')
-
+            
             MP1_mean = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].mean()
             MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
 
@@ -836,12 +862,12 @@ def ElevationReject(dfSTA,pos,config,name,st):
         # Create histogram (bins: 0-95 in steps of 5)
         bins = np.arange(0, 100, 5)  # 0-95 in steps of 5
         sns.histplot(data = dfSTA['elevation'],
-                     bins=bins,
-                     color='steelblue',
-                     edgecolor='white',
-                     linewidth=1.2,
-                     alpha=0.85
-                     )
+                      bins=bins,
+                      color='steelblue',
+                      edgecolor='white',
+                      linewidth=1.2,
+                      alpha=0.85
+                      )
 
         # Customize the plot
         plt.title(name, pad=20, fontweight='bold')
@@ -855,7 +881,8 @@ def ElevationReject(dfSTA,pos,config,name,st):
 
 
         # Add timestamp to right margin
-        plt.figtext(0.99, 0.5,  'Computed at: ' + st + ' UTC-3\n', rotation=90)
+        plt.figtext(1.05, 0.3,  'GNSS_cal_tools \n Computed at: ' + st + ' UTC-3\n',
+                    rotation=90,fontweight="bold",  ha='right')
 
 
 
@@ -868,7 +895,8 @@ def ElevationReject(dfSTA,pos,config,name,st):
         plt.figure(figsize=(12, 8), dpi=200, facecolor='white')
 
         # Add timestamp to right margin
-        plt.figtext(0.8, 0.4,  'Computed at: ' + st + ' UTC-3\n', rotation=90)
+        plt.figtext(0.85, 0.4,  'GNSS_cal_tools \n Computed at: ' + st + ' UTC-3\n',
+                    rotation=90,  fontweight="bold",  ha='right')
 
         ax = plt.subplot(111, polar=True, label = config['SYS'])
         ax.set_theta_zero_location('N')  # 0° at North
@@ -881,13 +909,8 @@ def ElevationReject(dfSTA,pos,config,name,st):
         ax.set_rlabel_position(180)
         ax.set_title(f'{name} – Skyplot', va='bottom', fontweight='bold')
         plt.savefig(f'./outputs/Skyplot_{name}.png', dpi=100, bbox_inches='tight',facecolor='0.9')
-        #plt.show()
         plt.close()
 
-        
-        
-        
-        
     return(dfSTA)
 
 def C1P1(sta,df_sta):

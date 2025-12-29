@@ -1,31 +1,31 @@
  GNSS_cal_tools Version: 2/1/25
-Processing date and time: 2025-06-11 09:37:34 UTC-3
+Processing date and time: 2025-12-29 14:38:47 UTC-3
 Output interval (s) = 300
 Code threshold (ns) = 20
 Residual threshold (m) = 0.05
 Processed system: G. (GPS:G, Galileo:R, Glonass:R, Beidu:C)
-Min Elevation (deg): 5
+Min Elevation (deg): 10
 
 INPUT FILES
  BRDC00IGS_R_20242350000_01D_MN.rnx	RINEX version: 3.04
  AGGO2350.24O	RINEX version: 3.05
  SIMr2350.24O	RINEX version: 3.04
 
-Distance from headers is 10.26 m
+Distance from headers is 10.32 m
 Interval of AGGO2350.24O is 30.0 s
 Interval of SIMr2350.24O is 30.0 s
 
-Median and stdev of C1P1 bias in AGGO2350.24O: (1.34 +/- 1.09) ns
-Median and stdev of C1P1 bias in SIMr2350.24O: (1.67 +/- 1.11) ns
+Median and stdev of C1P1 bias in AGGO2350.24O: (1.35 +/- 1.09) ns
+Median and stdev of C1P1 bias in SIMr2350.24O: (1.68 +/- 1.08) ns
 
-Median and stdev of C1 difference: (-110.47 +/- 0.5) ns
-Median and stdev of P1 difference: (-110.18 +/- 0.51) ns
-Median and stdev of P2 difference: (-109.6 +/- 0.64) ns
+Median and stdev of C1 difference: (-109.55 +/- 0.47) ns
+Median and stdev of P1 difference: (-109.26 +/- 0.48) ns
+Median and stdev of P2 difference: (-108.69 +/- 0.6) ns
 
 Calculated delays in station SIMr2350.24O(DUT station):
-INTdlyC1: 23.4
-INTdlyP1: 21.3
-INTdlyP2: 18.9
+INTdlyC1: 22.4
+INTdlyP1: 20.4
+INTdlyP2: 18.0
 CABdly: 328.3
 REFdly: 13.7
 
