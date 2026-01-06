@@ -58,14 +58,16 @@ Edit the configuration in conf.py to set your parameters.
 
 ```python
 config = {
- 'elmin': 5, # Minimum elevation angle (degrees)
- 'intcod': 300, # Interval for code averaging (seconds)
- 'ithr': 20, # Code threshold (ns)
- 'thres': 0.05, # Residual threshold
- 'SYS': 'G', # GNSS system (G=GPS)
- 'plotelevations': True, # Enable elevation histograms
- 'timeplots': True, # Enable time difference plots
- 'calculate_delays': True, # Enable delay calculation
+    'elmin': 5,    # Elevation minimum, in degrees
+    'intcod': 300, # Default: one code average every 300 s
+    'ithr': 20,    # Default code threshold = 20 ns
+    'thres': 0.05, # Option to read residual threshold (L336)
+    'SYS': 'G',    # System to calibrate (GPS:G, Galileo:E, Glonass:R, Beidu:C)
+    # PLOT AND CALCULATION OPTIONS
+    'plotelevations': True,        # Plot histograms of elevations
+    'timeplots': True,             # Plot time differneces and allan deviations
+    'calculate_delays': True,      # Calculation of delays in DUT receiver
+    'plot_mp_errors': True,
 }
 ```
 
@@ -126,7 +128,7 @@ delays_b = {  # DUT station (unknown values should be NaN)
 Run the script directly from your IDE or from the console: 
 
 ```bash
-python GNSS_calibration_transfer.py
+python GNSS_cal_tools.py
 ```
 
 ## Limitations
