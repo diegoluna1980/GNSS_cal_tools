@@ -15,8 +15,8 @@ from conf import (config, file_a, file_b, file_nav, pos_a, pos_b, delays_a,
 )
 
 from GNSS_cal_tools_subs import (
-    OExyz, dfSTAgen, dfNAVgen, C1P1, outputs,
-    ElevationReject, figures, loader, calibration, DIFgen1,
+    OExyz, dfSTAgen, dfNAVgen, C1P1, outputsG, outputsE,
+    ElevationReject, figuresG, figuresE, loader, calibration, DIFgenG, DIFgenE,
     APOcorrection, multipath
 )
 
@@ -86,24 +86,32 @@ df_sta_b, sta_b = multipath(df_sta_b, config, sta_b, st)
 
 
 # Add C1P1 bias
-sta_a = C1P1(sta_a,df_sta_a)
-sta_b = C1P1(sta_b,df_sta_b)
+if config['SYS'] == 'G':
+    sta_a = C1P1(sta_a,df_sta_a)
+    sta_b = C1P1(sta_b,df_sta_b)
 
-# Genero diferencias
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
-      ': Creation of dataframe of time differences')  
-dif = DIFgen1(df_sta_a, df_sta_b, config, pos_a, pos_b)
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE\n')
+# Generation of differences, text Outputs and rawdif calculation.
+# rawdiff = a - b
 
-# Text Outputs and rawdif calculation. rawdiff = a - b
-rawdiff = outputs(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
+if config['SYS'] == 'G':
+    dif = DIFgenG(df_sta_a, df_sta_b, config, pos_a, pos_b)
+    rawdiff = outputsG(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
+ 
+if config['SYS'] == 'E':
+    dif = DIFgenE(df_sta_a, df_sta_b, config, pos_a, pos_b)
+    rawdiff = outputsE(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
+
 
 # Results of calibration (optional)
-if config['calculate_delays']:
+if config['calculate_delays'] and config['SYS'] == 'G':
     delays_b = calibration(rawdiff, delays_a, delays_b, sta_a, sta_b)
 
 # Figure Outputs
-figures(dif, config, ts, sta_a, sta_b)
+if config['SYS'] == 'G':
+    figuresG(dif, config, ts, sta_a, sta_b)
+if config['SYS'] == 'E':
+    figuresE(dif, config, ts, sta_a, sta_b)
+
 
 # Stop time
 stop_time = time.time()

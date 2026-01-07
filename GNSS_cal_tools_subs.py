@@ -278,7 +278,137 @@ def loader(file,config):
             dataset = gr.load(file, use=config['SYS'], meas=['C1', 'P1', 'P2'])
     return(dataset, file_hdr)
 
-def figures(dif,config,ts, sta_a, sta_b):
+def figuresE(dif, config, ts, filename_a, filename_b):
+    
+    """
+    Generates plots of time series and time deviations (TDEV) 
+    for E1 and E5 Galileo code corrections, and saves them to a PDF.
+
+    Parameters:
+    - dif: DataFrame containing corrected GNSS code data with MJD index.
+    - config: dict with configuration options 
+    - ts: Unix timestamp indicating when the computation was performed.
+    - filename_a
+    - filename_b
+    """
+    
+    
+    if config['timeplots']:
+
+        # Conversion factor from kilometers to nanoseconds
+        k = 0.299792458
+        
+        # List of unique Modified Julian Dates (MJD)
+        MJD = dif.MJD.unique()
+        
+        # Group data by MJD and compute median values
+        pop1 = dif.groupby(['MJD']).median()
+        
+        # Convert median corrected values from km to ns
+        E1 = pop1['E1_corr'].to_numpy() / k
+        E5 = pop1['E5_corr'].to_numpy() / k
+               
+        # Compute Time Deviation (TDEV) using allantools for each observable
+        (E1_tau_tdev, E1_tdev, E1_tdeverr, n_tdev) = allantools.tdev(E1, rate= 1/config['intcod'], data_type="phase", taus='octave')
+        (E5_tau_tdev, E5_tdev, E5_tdeverr, n_tdev) = allantools.tdev(E5, rate= 1/config['intcod'], data_type="phase", taus='octave')
+        
+        # Create figure and layout        
+        fig1 = plt.figure(1,figsize=(12,8))
+        plt.subplots_adjust(hspace = .3)
+        
+        # Add timestamp to right margin
+        plt.figtext(0.95, 0.5,  'Computed at: ' + datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S') + ' UTC-3\n', rotation=90)
+        plt.figtext(0.05,0.01,'Rawdifferences of ' + filename_a + ' - ' + filename_b)
+        # Plot time series for E1        
+        plt.subplot(221)
+        plt.plot(MJD, E1, 'b.',markeredgewidth=0.0,zorder=4,label='E1')
+        plt.title('Median: (' + str(round(np.median(E1),2)) + '+/-' + str(round(E1.std(),2)) + ') ns')
+        plt.legend(loc=0, prop={'size': 12}, framealpha=1)
+        plt.ylabel('Time / ns', size = 14)
+        plt.xlabel('MJD', size = 14)
+        plt.grid(linestyle='dashed')
+        locs,labels = plt.xticks()
+        plt.xticks( rotation=30,size=12)
+        plt.yticks(size=12)
+        xx, locs = plt.xticks()
+        ll = ['%.0f' % a for a in xx]
+        plt.xticks(xx, ll)
+        plt.tick_params(direction="in")
+
+        # Plot time series for E5
+        plt.subplot(222)
+        plt.plot(MJD, E5, 'b.',markeredgewidth=0.0,zorder=4,label='E5')
+        plt.title('Median: (' + str(round(np.median(E5),2)) + '+/-' + str(round(E5.std(),2)) + ') ns')
+        plt.xlabel('MJD', size = 14)
+        plt.legend(loc=0, prop={'size': 12}, framealpha=1)
+        plt.grid(linestyle='dashed')
+        locs,labels = plt.xticks()
+        plt.xticks( rotation=30,size=12)
+        plt.yticks(size=12)
+        xx, locs = plt.xticks()
+        ll = ['%.0f' % a for a in xx]
+        plt.xticks(xx, ll)
+        plt.tick_params(direction="in")
+        
+        # Plot time series for P2
+        # plt.subplot(233)
+        # #plt.plot(MJD, P2, 'b.',markeredgewidth=0.0,zorder=4,label='P2')
+        # #plt.title('Median: (' + str(round(np.median(P2),1)) + '+/-' + str(round(P2.std(),1)) + ') ns')
+        # plt.xlabel('MJD', size = 14)
+        # plt.legend(loc=0, prop={'size': 12}, framealpha=1)
+        # plt.grid(linestyle='dashed')
+        # locs,labels = plt.xticks()
+        # plt.xticks( rotation=30,size=12)
+        # plt.yticks(size=12)
+        # xx, locs = plt.xticks()
+        # ll = ['%.0f' % a for a in xx]
+        # plt.xticks(xx, ll)
+        # plt.tick_params(direction="in")
+        
+        # Plot TDEV for E1
+        plt.subplot(223)
+        plt.loglog(E1_tau_tdev, E1_tdev, '-ko',markeredgewidth=0.0,zorder=4)
+        plt.axhline(y=0.1, color='r', linestyle='--')  # Red dashed line at y=5
+        plt.ylabel('Time deviation / ns', size = 14)
+        plt.xlabel('Time / s', size = 14)
+        plt.yticks(size=12)
+        plt.xticks(size=12)
+        plt.grid(linestyle='dashed')
+        plt.tick_params(direction="in")
+        
+        # Plot TDEV for E5
+        plt.subplot(224)
+        plt.loglog(E5_tau_tdev, E5_tdev, '-ko',markeredgewidth=0.0,zorder=4)
+        plt.axhline(y=0.1, color='r', linestyle='--')  # Red dashed line at y=5
+        plt.xlabel('Time / s', size = 14)
+        #plt.title('P1_alllan')
+        plt.yticks(size=12)
+        plt.xticks(size=12)
+        plt.grid(linestyle='dashed')
+        plt.tick_params(direction="in")
+        
+        # # Plot TDEV for P2
+        # plt.subplot(236)
+        # #plt.loglog(P2_tau_tdev, P2_tdev, '-ko',markeredgewidth=0.0,zorder=4)
+        # plt.axhline(y=0.1, color='r', linestyle='--')  # Red dashed line at y=5
+        # plt.xlabel('Time / s', size = 14)
+        # #plt.title('P2_alllan')
+        # plt.yticks(size=12)
+        # plt.xticks(size=12)
+        # plt.grid(linestyle='dashed')
+        # plt.tick_params(direction="in")
+        
+        # Global title and save
+        plt.suptitle('E1 and E5 plots - GNSS_cal_tools.py', fontsize=16,  fontweight='bold')
+        destino = './outputs/E1E5plotsGNSS_cal_tools.pdf'
+        fig1.savefig(destino,facecolor='0.9', dpi = 200)
+        plt.close()
+
+
+
+
+
+def figuresG(dif,config,ts, sta_a, sta_b):
     
     """
     Generates plots of time series and time deviations (TDEV) 
@@ -299,14 +429,32 @@ def figures(dif,config,ts, sta_a, sta_b):
         # List of unique Modified Julian Dates (MJD)
         MJD = dif.MJD.unique()
         
+#########################################################        
         # Group data by MJD and compute median values
         pop1 = dif.groupby(['MJD']).median()
+        
         
         # Convert median corrected values from m to ns
         C1 = pop1['C1_corr'].to_numpy() / k
         P1 = pop1['P1_corr'].to_numpy() / k
         P2 = pop1['P2_corr'].to_numpy() / k
-               
+##########################################################               
+        
+        # C1 = dif.groupby('MJD').apply(lambda g: np.average(g['C1_corr'],
+        #     weights=np.sin(np.deg2rad(g['elevation']))**2        ))
+
+        # P1 = dif.groupby('MJD').apply(lambda g: np.average(g['P1_corr'],
+        #     weights=np.sin(np.deg2rad(g['elevation']))**2        ))
+
+        # P2 = dif.groupby('MJD').apply(lambda g: np.average(g['P2_corr'],
+        #     weights=np.sin(np.deg2rad(g['elevation']))**2       ))
+
+        # C1 = C1.to_numpy() / k
+        # P1 = P1.to_numpy() / k
+        # P2 = P2.to_numpy() / k
+
+##########################################################               
+
         # Compute Time Deviation (TDEV) using allantools for each observable
         (C1_tau_tdev, C1_tdev, C1_tdeverr, n_tdev) = allantools.tdev(C1, rate= 1/config['intcod'], data_type="phase", taus='octave')
         (P1_tau_tdev, P1_tdev, P1_tdeverr, n_tdev) = allantools.tdev(P1, rate= 1/config['intcod'], data_type="phase", taus='octave')
@@ -405,8 +553,83 @@ def figures(dif,config,ts, sta_a, sta_b):
         plt.close()
         
         
+def DIFgenE(dfSTA1, dfSTA2, config, pos1, pos2):
+    """
+    Computes observation differences between two Galileo stations after temporal alignment
+    and satellite-based geometric corrections.
 
-def DIFgen1(dfSTA1, dfSTA2, config, pos1, pos2):
+    Parameters
+    ----------
+    dfSTA1 : pd.DataFrame
+        Observation data from station 1.
+    dfSTA2 : pd.DataFrame
+        Observation data from station 2.
+        config : dict
+        Configuration dictionary, must include 'intcod' (integration time in seconds).
+    pos1 : np.ndarray
+        ECEF coordinates of station 1 (3-element array).
+    pos2 : np.ndarray
+        ECEF coordinates of station 2 (3-element array).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing aligned satellite observations, differences and geometry-corrected values.
+    """
+
+    codint = config['intcod'] / 86400  # Convert integration interval to days
+
+    # Round MJD to the nearest integration time
+    dfSTA1['MJD_bin'] = (dfSTA1['MJD'] / codint).round() * codint
+    dfSTA2['MJD_bin'] = (dfSTA2['MJD'] / codint).round() * codint
+
+    # Median values per (MJD_bin, sv) for both stations
+    grp_cols = ['MJD_bin', 'sv']
+    agg_cols1 = ['E1', 'E5', 'X', 'Y', 'Z', 'elevation']
+    agg_cols2 = ['E1', 'E5']
+
+    dat1 = dfSTA1.groupby(grp_cols)[agg_cols1].median().reset_index()
+    dat2 = dfSTA2.groupby(grp_cols)[agg_cols2].median().reset_index()
+
+    # Merge aligned records
+    dif = pd.merge(dat1, dat2, on=grp_cols, suffixes=('_1', '_2'))
+
+    # Calculate observation differences
+    dif['E1'] = dif['E1_1'] - dif['E1_2']
+    dif['E5'] = dif['E5_1'] - dif['E5_2']
+
+    # Remove gross outliers
+    dif = dif[(dif[['E1', 'E5']].abs() <= 300).all(axis=1)]
+
+    # Median Absolute Deviation (MAD) filtering
+    def mad_filter(col, u=3):
+        med = col.median()
+        mad = 1.4826 * np.median(np.abs(col - med))
+        return (col - med).abs() <= u * mad
+
+    for col in ['E1', 'E5']:
+        dif = dif[mad_filter(dif[col])]
+
+    # Geometry correction
+    x = pos2 - pos1
+    xsat = dif['X'] - pos1[0]
+    ysat = dif['Y'] - pos1[1]
+    zsat = dif['Z'] - pos1[2]
+    r = np.sqrt(xsat**2 + ysat**2 + zsat**2)
+    corg = (x[0]*xsat + x[1]*ysat + x[2]*zsat) / r
+
+    dif['E1_corr'] = dif['E1'] - corg
+    dif['E5_corr'] = dif['E5'] - corg
+
+    dif = dif.rename(columns={'MJD_bin': 'MJD'})
+    
+    # Keep only relevant columns
+    
+    return dif[['MJD', 'sv', 'X', 'Y', 'Z', 'elevation', 'E1', 'E5', 'E1_corr', 'E5_corr']]
+
+
+
+def DIFgenG(dfSTA1, dfSTA2, config, pos1, pos2):
     """
     Computes observation differences between two GNSS stations after temporal alignment
     and satellite-based geometric corrections.
@@ -485,188 +708,85 @@ def DIFgen1(dfSTA1, dfSTA2, config, pos1, pos2):
     return dif[['MJD', 'sv', 'X', 'Y', 'Z', 'elevation', 'C1', 'P1', 'P2', 'P1-P2', 'C1_corr', 'P1_corr', 'P2_corr']]
 
 
+def outputsE(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
-def DIFgen(dfSTA1, dfSTA2, config, pos1, pos2):
-
-    """
-    Generate differential GNSS observations between two stations.
-
-    This function computes epoch-wise differences between pseudorange observations 
-    (C1, P1, P2) from two stations, aligned by time and satellite. It applies filters 
-    to remove outliers and corrects the differences based on the geometric projection 
-    of the baseline between the stations onto the satellite directions.
-
-    Parameters:
-    -----------
-    dfSTA1 : pd.DataFrame
-        DataFrame for station 1. Must contain columns:
-        ['MJD', 'sv', 'C1', 'P1', 'P2', 'X', 'Y', 'Z', 'elevation']
-
-    dfSTA2 : pd.DataFrame
-        DataFrame for station 2. Must contain columns:
-        ['MJD', 'sv', 'C1', 'P1', 'P2']
-
-    config : dict
-        Configuration dictionary containing:
-        - 'intcod': integration time in seconds (typically 300)
-
-    pos1 : array-like of float
-        coordinates [X, Y, Z] of station 1
-
-    pos2 : array-like of float
-        coordinates [X, Y, Z] of station 2
-
-    Returns:
-    --------
-    dif : pd.DataFrame
-        DataFrame of differential measurements and metadata with columns:
-        ['MJD', 'sv', 'X', 'Y', 'Z', 'elevation', 
-         'C1', 'P1', 'P2', 'P1-P2', 
-         'C1_corr', 'P1_corr', 'P2_corr']
-    """
-
-    # Convert integration time from seconds to days
-    codint = config['intcod']/86400  
-    dat1 = pd.DataFrame()
-    dat2 = pd.DataFrame()
+    # Open file
+    filename = sta1.filename.partition(".")[0] + sta2.filename.partition(".")[0]
+    file_sum = open('./outputs/' + filename + '_resultsGalileo.txt', 'w')
     
-    # Generate time vector from min to max MJD, spaced by integration time
-    # (usually 300 s, the value of intcod)
-    dat1['MJD'] = np.arange(np.floor(dfSTA1['MJD'].min()), np.ceil(dfSTA1['MJD'].max()) + codint, codint)
-    
-    # Get all unique satellites
-    # A las columnas con las fechas, le agrego una entrada por cada satelite
-    arr = dfSTA1['sv'].unique()
-    df_arr = pd.DataFrame({'sv': arr})
-    
-    # Cross join: each time instant x each satellite
-    dat1 = dat1.merge(df_arr,how='cross')
-    
-    # Copio al dat2
-    dat2['MJD'] = dat1['MJD'].copy()
-    dat2['sv'] = dat1['sv'].copy()
-    
-    # Precompilar valores para asignar
-    dat1[['C1', 'P1', 'P2']] = np.nan
-    C1_vals = []
-    P1_vals = []
-    P2_vals = []
-    X_vals = []
-    Y_vals = []
-    Z_vals = []
-    ele_vals = []
-    
-    # Fill dat1 with median values within each time window
-    for row in dat1.itertuples(index=False):
-         sat = row.sv
-         mjd = row.MJD
-         mask = (dfSTA1['sv'] == sat) & (np.abs(dfSTA1['MJD'] - mjd) < codint/2)
-         subset = dfSTA1.loc[mask]
-         C1_vals.append(subset['C1'].median())
-         P1_vals.append(subset['P1'].median())
-         P2_vals.append(subset['P2'].median())
-         X_vals.append(subset['X'].median())
-         Y_vals.append(subset['Y'].median())
-         Z_vals.append(subset['Z'].median())
-         ele_vals.append(subset['elevation'].median())
-    
-    # Assign aggregated values to dat1
-    dat1['C1'] = C1_vals
-    dat1['P1'] = P1_vals
-    dat1['P2'] = P2_vals
-    dat1['X'] = X_vals
-    dat1['Y'] = Y_vals
-    dat1['Z'] = Z_vals
-    dat1['elevation'] = ele_vals
-    
-    # Repeat for second station (no satellite positions needed)
-    dat2[['C1', 'P1', 'P2']] = np.nan
-    C1_vals = []
-    P1_vals = []
-    P2_vals = []
-    
-    
-    for row in dat2.itertuples(index=False):
-        sat = row.sv
-        mjd = row.MJD
-        mask = (dfSTA2['sv'] == sat) & (np.abs(dfSTA2['MJD'] - mjd) < codint/2)
-        subset = dfSTA2.loc[mask]
-        C1_vals.append(subset['C1'].median())
-        P1_vals.append(subset['P1'].median())
-        P2_vals.append(subset['P2'].median())
+    file_sum.write(
+    f" GNSS_cal_tools Version: {VERSION}\n"
+    f"Processing date and time: {st} UTC-3\n"
+    f"Output interval (s) = {config['intcod']}\n"
+    f"Code threshold (ns) = {config['ithr']}\n"
+    f"Residual threshold (m) = {config['thres']}\n"
+    f"Processed system: {config['SYS']}. (GPS:G, Galileo:R, Glonass:R, Beidu:C)\n"
+    f"Min Elevation (deg): {config['elmin']}\n\n"
+    f"INPUT FILES\n"
+    f" {file_nav}\tRINEX version: {nav.version}\n"
+    f" {sta1.filename}\tRINEX version: {sta1.version}\n"
+    f" {sta2.filename}\tRINEX version: {sta2.version}\n\n"
+    )
 
-    # Asignar las columnas
-    dat2['C1'] = C1_vals
-    dat2['P1'] = P1_vals
-    dat2['P2'] = P2_vals
+
+    file_sum.write(
+    f"Distance from headers is {dist:.2f} m\n"
+    f"Interval of {sta1.filename} is {sta1.interval} s\n"
+    f"Interval of {sta2.filename} is {sta2.interval} s\n\n"
+    )
+
+    print(
+        f"Distance read from headers is: {dist:.2f} m\n"
+        f"Interval of file1 is {sta1.interval} s\n"
+        f"Interval of file2 is {sta2.interval} s"
+    )
+
+
+    if dist > 1000:
+        file_sum.write('WARNING: Distance read from headers is ' + dist + ' m!\n')
+        print('WARNING: Distance read from headers is ' + dist + ' m!')
     
-    # Compute differences between stations
-    dif = pd.DataFrame()    
-    #dif = dat1[['MJD', 'sv']].copy()
-    dif = dat1[['MJD', 'sv', 'X', 'Y','Z','elevation']].copy()
+    if sta1.interval != sta2.interval:
+        file_sum.write('Not the same data interval\n')
+        print('Not the same data interval')
+        
 
-    # Calculo diferencias    
-    dif['C1'] = dat1['C1'] - dat2['C1']
-    dif['P1'] = dat1['P1'] - dat2['P1']
-    dif['P2'] = dat1['P2'] - dat2['P2']
-    dif['P1-P2'] = dif['P1'] - dif['P2']
+    pop1 = dif.groupby(['MJD']).median()
+
+    rawdiff = {
+        'medianE1' : round(pop1['E1_corr'].median()/0.299792458, 2),
+        'stdE1' : round(pop1['E1_corr'].std()/0.299792458, 2),
+        'medianE5' : round(pop1['E5_corr'].median()/0.299792458, 2),
+        'stdE5' : round(pop1['E5_corr'].std()/0.299792458, 2),
+        }
+
+
+    file_sum.write(
+    f"Median and stdev of E1 difference: ({rawdiff['medianE1']} +/- {rawdiff['stdE1']}) ns\n"
+    f"Median and stdev of E5 difference: ({rawdiff['medianE5']} +/- {rawdiff['stdE5']}) ns\n"
+    )
+
+    print(
+        f"Median and stdev of E1 difference: ({rawdiff['medianE1']} +/- {rawdiff['stdE1']}) ns\n"
+        f"Median and stdev of E5 difference: ({rawdiff['medianE5']} +/- {rawdiff['stdE5']}) ns\n"
+    )
+
     
-    # Filter out large outliers (absolute value <= 300 ns)(Line 1588 dclrinex)
-    dif = dif[(dif[['C1', 'P1', 'P2']].abs() <= 300).all(axis=1)]
-    
-    # Additional filter on ionospheric observable P1-P2 (<= 30 ns)
-    # (Line 1592 dclrinex) (not really necessary in this case)
-    dif = dif[(dif[['P1-P2']].abs() <= 30).all(axis=1)]
+    file_sum.close()
 
-    #------------------------------------------------------------------------------
-    # Apply Median Absolute Deviation (MAD) filter for C1, P1, and P2
-    #------------------------------------------------------------------------------
 
-    u = 3 # Threshold for MAD filtering (u * sigma)
-    Xc = dif['C1'].median()
-    S=1.4826*np.median(np.abs(dif['C1']-Xc))
-    dif['C1-Xc'] = dif['C1']-Xc
-    dif = dif[(dif[['C1-Xc']].abs() <= u*S).all(axis=1)]
-
-    Xc = dif['P1'].median()
-    S=1.4826*np.median(np.abs(dif['P1']-Xc))
-    dif['P1-Xc'] = dif['P1']-Xc
-    dif = dif[(dif[['P1-Xc']].abs() <= u*S).all(axis=1)]
-
-    Xc = dif['P2'].median()
-    S=1.4826*np.median(np.abs(dif['P2']-Xc))
-    dif['P2-Xc'] = dif['P2']-Xc
-    dif = dif[(dif[['P2-Xc']].abs() <= u*S).all(axis=1)]
-    
-    dif.drop(columns='C1-Xc', inplace=True)
-    dif.drop(columns='P1-Xc', inplace=True)
-    dif.drop(columns='P2-Xc', inplace=True)
-
-    #------------------------------------------------------------------------------
-    # Geometry-based correction (project baseline onto satellite direction)
-    #------------------------------------------------------------------------------
-
-    x = pos2-pos1
-
-    xsta, ysta, zsta = pos1
-    xsat =  dif['X'].to_numpy() - xsta
-    ysat =  dif['Y'].to_numpy() - ysta
-    zsat =  dif['Z'].to_numpy() - zsta
-
-    r = np.sqrt(xsat**2+ysat**2+zsat**2) # 1664 in dclrinex
-    
-    # Projection of baseline onto satellite line-of-sight    
-    corg1 = (x[0]*xsat + x[1]*ysat + x[2]*zsat)/r
-    
-    # Apply correction to measurements
-    dif['C1_corr'] = (dif['C1'].to_numpy() - corg1)
-    dif['P1_corr'] = (dif['P1'].to_numpy() - corg1)
-    dif['P2_corr'] = (dif['P2'].to_numpy() - corg1)
+    cols_a_exportar = dif[['MJD','sv', 'E1_corr', 'E5_corr']].copy()
+    cols_a_exportar.columns = ['MJD', 'sv', 'E1', 'E5']
+    cols_a_exportar['MJD'] = cols_a_exportar['MJD'].map(lambda x: f"{x:.5f}")
+    cols_a_exportar['E1']  = cols_a_exportar['E1'].map(lambda x: f"{x:.2f}")
+    cols_a_exportar['E5']  = cols_a_exportar['E5'].map(lambda x: f"{x:.2f}")
+    cols_a_exportar.to_csv( './outputs/' + filename + '_measurementsGalileo.txt', sep='\t', index=False)
     
 
-    return(dif)
+    return(rawdiff)
+
     
-def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
+def outputsG(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     # Open file
     filename = sta1.filename.partition(".")[0] + sta2.filename.partition(".")[0]
@@ -717,7 +837,13 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         f"Median and stdev of C1P1 bias in {sta2.filename}: "
         f"({round(sta2['c1p1_bias_median'].values / 0.299792458, 2)} +/- "
         f"{round(sta2['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n\n"
+        
+        
     )
+
+
+
+
 
     print(
         f"Median and stdev of C1P1 bias in {sta1.filename}: "
@@ -729,15 +855,23 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         f"{round(sta2['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
     )
 
-    print(
+    if config['plot_mp_errors']:
+        print(
+            f"Mean and stdev of L1 Multipath Error in {sta1.filename}: "
+            f"({round(float(sta1.MP1_mean), 2)} +/- "
+            f"{round(float(sta1.MP1_std), 2)}) ns\n"
+            f"Mean and stdev of L1 Multipath Error in {sta2.filename}: "
+            f"({round(float(sta2.MP1_mean), 2)} +/- "
+            f"{round(float(sta2.MP1_std), 2)}) ns\n"
+                )
+        file_sum.write(
         f"Mean and stdev of L1 Multipath Error in {sta1.filename}: "
         f"({round(float(sta1.MP1_mean), 2)} +/- "
         f"{round(float(sta1.MP1_std), 2)}) ns\n"
         f"Mean and stdev of L1 Multipath Error in {sta2.filename}: "
         f"({round(float(sta2.MP1_mean), 2)} +/- "
-        f"{round(float(sta2.MP1_std), 2)}) ns\n"
-            )
-
+        f"{round(float(sta2.MP1_std), 2)}) ns\n\n"
+        )
 
     pop1 = dif.groupby(['MJD']).median()
 
@@ -768,8 +902,8 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     file_sum.close()
 
 
-    cols_a_exportar = dif[['MJD','sv', 'C1_corr', 'P1_corr', 'P2_corr']].copy()
-    cols_a_exportar.columns = ['MJD', 'sv', 'C1', 'P1', 'P2']
+    cols_a_exportar = dif[['MJD','sv', 'C1_corr', 'P1_corr', 'P2_corr', 'elevation']].copy()
+    cols_a_exportar.columns = ['MJD', 'sv', 'C1', 'P1', 'P2','elevation']
     cols_a_exportar['C1'] = cols_a_exportar['C1']/0.299792458
     cols_a_exportar['P1'] = cols_a_exportar['P1']/0.299792458
     cols_a_exportar['P2'] = cols_a_exportar['P2']/0.299792458
@@ -777,6 +911,8 @@ def outputs(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     cols_a_exportar['C1']  = cols_a_exportar['C1'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['P1']  = cols_a_exportar['P1'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['P2']  = cols_a_exportar['P2'].map(lambda x: f"{x:.2f}")
+    cols_a_exportar['elevation']  = cols_a_exportar['elevation'].map(lambda x: f"{x:.1f}")
+
     cols_a_exportar.to_csv( './outputs/' + filename + '_measurements.txt', sep='\t', index=False)
     
 
@@ -983,6 +1119,11 @@ def OExyz(dfnav_first, dfSTA, stafilename):
         # two steps are usually sufficient " Applied GPS for Engineers and Project Managers
 
         result[i] = E_solution[0][0]
+#        salida, info, ier, mesg = E_solution
+#        print(f"Iteraciones: {info['nfev']}")
+#        print(f"Error residual: {info['fvec'][0]:.2e}")
+#        print(f"Código de salida: {ier} - {mesg}")
+
     dfSTA['EK'] = result
     
     # Calculo de la true anomaly, vk. 
@@ -1095,7 +1236,8 @@ def dfNAVgen(nav):
     print(f'Unhealthy/healthy sats in {nav.filename}: {unhealthy_count}/{healthy_count}')
 
     #Remove satellites with clock drift bigger than 1e-11
-    #dfnav = dfnav[np.abs(dfnav['SVclockDrift']) <= 1e-11]
+    #dfnav = dfnav[dfnav['SVclockDrift'].abs() < 1e-11]
+
     
     #Adding MJD columns
     dfnav['time'] = pd.to_datetime(dfnav['time'])

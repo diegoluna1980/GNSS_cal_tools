@@ -12,7 +12,7 @@ import numpy as np
 # =============================================================================
 
 config = {
-    'elmin': 10,    # Elevation minimum, in degrees
+    'elmin': 5,    # Elevation minimum, in degrees
     'intcod': 300, # Default: one code average every 300 s
     'ithr': 20,    # Default code threshold = 20 ns
     'thres': 0.05, # Option to read residual threshold (L336)
@@ -25,11 +25,11 @@ config = {
 }
 
 # RINEX OBS files
-file_a = 'AGGO2340.24O'
-file_b = 'SIMr2340.24O'  # The station that will be calibrated
+file_a = 'AGGO2350.24O'
+file_b = 'SIMr2350.24O'  # The station that will be calibrated
 
 # RINEX navigation file
-file_nav = 'BRDC00IGS_R_20242340000_01D_MN.rnx'
+file_nav = 'BRDC00IGS_R_20242350000_01D_MN.rnx'
 
 # Positions extracted from NRCan PPP solutions
 # pos_a = np.array([2765121.467, -4449250.973, -3626403.769]) #NAD83
