@@ -21,7 +21,7 @@ config = {
     'plotelevations': True,        # Plot histograms of elevations
     'timeplots': True,             # Plot time differneces and allan deviations
     'calculate_delays': True,      # Calculation of delays in DUT receiver
-    'plot_mp_errors': True,
+    'plot_mp_errors': True,	   # Plot Multipath errors	
 }
 
 # RINEX OBS files

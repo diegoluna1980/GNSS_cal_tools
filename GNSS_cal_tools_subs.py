@@ -267,18 +267,27 @@ def loader(file,config):
     
     if (file_hdr['filetype'] == 'O'):
         if (file_hdr['version'] > 3):
-            #dataset = gr.load(file, use=config['SYS'],
-            #                   meas=['C1C', 'C1W', 'C2W'])
-            dataset = gr.load(file, use=config['SYS'],
-                               meas=['C1C', 'C1W', 'C2W','L2W','L1C'])
-            dataset = dataset.rename({"C1C": "C1"})
-            dataset = dataset.rename({"C1W": "P1"})
-            dataset = dataset.rename({"C2W": "P2"})
+            if config['SYS'] == 'G':
+                #dataset = gr.load(file, use=config['SYS'],
+                #                   meas=['C1C', 'C1W', 'C2W'])
+                dataset = gr.load(file, use=config['SYS'],
+                                   meas=['C1C', 'C1W', 'C2W','L2W','L1C'])
+                dataset = dataset.rename({"C1C": "C1"})
+                dataset = dataset.rename({"C1W": "P1"})
+                dataset = dataset.rename({"C2W": "P2"})
+            if config['SYS'] == 'E':
+                dataset = gr.load(file, use=config['SYS'],
+                                  meas=['C1C', 'C5Q'])
+                dataset = dataset.rename({"C1C": "E1"})
+                dataset = dataset.rename({"C5Q": "E5"})                
+
         else:
             dataset = gr.load(file, use=config['SYS'], meas=['C1', 'P1', 'P2'])
+
+
     return(dataset, file_hdr)
 
-def figuresE(dif, config, ts, filename_a, filename_b):
+def figuresE(dif, config, ts, sta_a, sta_b):
     
     """
     Generates plots of time series and time deviations (TDEV) 
@@ -291,7 +300,6 @@ def figuresE(dif, config, ts, filename_a, filename_b):
     - filename_a
     - filename_b
     """
-    
     
     if config['timeplots']:
 
@@ -318,7 +326,7 @@ def figuresE(dif, config, ts, filename_a, filename_b):
         
         # Add timestamp to right margin
         plt.figtext(0.95, 0.5,  'Computed at: ' + datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S') + ' UTC-3\n', rotation=90)
-        plt.figtext(0.05,0.01,'Rawdifferences of ' + filename_a + ' - ' + filename_b)
+        plt.figtext(0.05,0.01,'Rawdifferences of ' + sta_a.filename + ' - ' + sta_b.filename)
         # Plot time series for E1        
         plt.subplot(221)
         plt.plot(MJD, E1, 'b.',markeredgewidth=0.0,zorder=4,label='E1')
@@ -400,9 +408,13 @@ def figuresE(dif, config, ts, filename_a, filename_b):
         
         # Global title and save
         plt.suptitle('E1 and E5 plots - GNSS_cal_tools.py', fontsize=16,  fontweight='bold')
-        destino = './outputs/E1E5plotsGNSS_cal_tools.pdf'
+        destino = './outputs/E1E5plots_' + sta_a.filename + '_' + sta_b.filename + '.pdf'       
+
         fig1.savefig(destino,facecolor='0.9', dpi = 200)
         plt.close()
+
+
+
 
 
 
@@ -777,6 +789,8 @@ def outputsE(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     cols_a_exportar = dif[['MJD','sv', 'E1_corr', 'E5_corr']].copy()
     cols_a_exportar.columns = ['MJD', 'sv', 'E1', 'E5']
+    cols_a_exportar['E1'] = cols_a_exportar['E1']/0.299792458
+    cols_a_exportar['E5'] = cols_a_exportar['E5']/0.299792458
     cols_a_exportar['MJD'] = cols_a_exportar['MJD'].map(lambda x: f"{x:.5f}")
     cols_a_exportar['E1']  = cols_a_exportar['E1'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['E5']  = cols_a_exportar['E5'].map(lambda x: f"{x:.2f}")
