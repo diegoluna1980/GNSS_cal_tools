@@ -27,7 +27,7 @@ MU = 3.9860050e14
 # OMEGAE - WGS84 value of the Earth's rotation rate in rad/sec
 OMEGAE = 7.292115e-5
 
-def multipath(dfSTA,config,sta,st):
+def multipathG(dfSTA,config,sta,st):
     
     """
     Calculate multipath error for GPS L1 observations.
@@ -53,107 +53,216 @@ def multipath(dfSTA,config,sta,st):
         Original DataFrame with additional 'MP1' column containing
         multipath error in nanoseconds
     """
-       
+   
+    # Constantes GPS            
+    f1, f2 = 1575.42e6, 1227.60e6  # Hz
+    c = 299792458 # m/s
+    l1 = c / f1 # wavelength L1 in m
+    l2 = c / f2 # wavelength L2 in m
     
-    if config['plot_mp_errors']:    
-        if config['SYS'] == 'G':
-            # Constantes GPS            
-            f1, f2 = 1575.42e6, 1227.60e6  # Hz
-            c = 299792458 # m/s
-            l1 = c / f1 # wavelength L1 in m
-            l2 = c / f2 # wavelength L2 in m
-            
-            alpha = (f1/f2)**2
-            K1 = 1 + 2/(alpha - 1)  # 4.091
-            K2 = 2/(alpha - 1)      # 3.091
-            
-            # Corrects phase slips
-            dfSTA['GF'] = dfSTA['L1C']*l1 - dfSTA['L2W']*l2
-            dfSTA['GF_diff'] = dfSTA.groupby('sv')['GF'].diff().abs()
-            
-            # slip if GF over 0.05 m 
-            slip_threshold = l1 / 4
-            dfSTA['slip'] = dfSTA['GF_diff'] > slip_threshold
-            
-            # Create Segment
-            dfSTA['segment'] = dfSTA.groupby('sv')['slip'].cumsum()
-            
-            # Calculate MP1
-            dfSTA['MP1'] = dfSTA['C1'] - K1*dfSTA['L1C']*l1 + K2*dfSTA['L2W']*l2
+    alpha = (f1/f2)**2
+    K1 = 1 + 2/(alpha - 1)  # 4.091
+    K2 = 2/(alpha - 1)      # 3.091
+    
+    # Corrects phase slips
+    dfSTA['GF'] = dfSTA['L1C']*l1 - dfSTA['L2W']*l2
+    dfSTA['GF_diff'] = dfSTA.groupby('sv')['GF'].diff().abs()
+    
+    # slip if GF over 0.05 m 
+    slip_threshold = l1 / 4
+    dfSTA['slip'] = dfSTA['GF_diff'] > slip_threshold
+    
+    # Create Segment
+    dfSTA['segment'] = dfSTA.groupby('sv')['slip'].cumsum()
+    
+    # Calculate MP1
+    dfSTA['MP1'] = dfSTA['C1'] - K1*dfSTA['L1C']*l1 + K2*dfSTA['L2W']*l2
 
-            # Corregir ambiguity by segment
-            dfSTA['MP1_corr'] = dfSTA.groupby(['sv','segment'])['MP1'].transform(
-                                lambda x: x - x.mean()  )
-                        
-            # Convert from meters to ns
-            dfSTA['MP1_corr'] = dfSTA['MP1_corr'] * 3.33564095 
-            
-            # Crear figura y ejes
-            fig, axs = plt.subplots(
-                nrows=1,
-                ncols=3,
-                figsize=(18, 5),
-                dpi=200,
-                facecolor='white'
-            )
-            
-            # --- Subplot 1: MP1_corr vs MJD ---
-            axs[0].plot(dfSTA['MJD'], dfSTA['MP1_corr'], 'k.')
-            axs[0].set_xlabel('MJD', fontsize=14)
-            axs[0].set_ylabel('Multipath Error / ns', fontsize=14)
-            axs[0].set_ylim([-5, 5])
-            axs[0].grid(True)
-            
-            # --- Subplot 2: MP1_corr vs Elevation ---
-            axs[1].plot(dfSTA['elevation'], dfSTA['MP1_corr'], 'k.')
-            axs[1].set_xlabel('Elevation / degrees', fontsize=14)
-            axs[1].set_ylabel('Multipath Error / ns', fontsize=14)
-            axs[1].set_ylim([-5, 5])
-            axs[1].grid(True)
-            
-            # --- Subplot 3: Histograma ---
-            axs[2].hist(
-                dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'],
-                bins=30,
-                alpha=0.7
-            )
-            axs[2].set_xlabel('Multipath Error / ns', fontsize=14)
-            axs[2].set_ylabel('Occurrence', fontsize=14)
-            axs[2].grid(True)
-            
-            # Texto común lateral
-            fig.text(
-                0.98, 0.5,
-                f'GNSS_cal_tools \n Computed at: {st} UTC-3',
-                rotation=90,
-                va='center',
-                ha='right',
-                fontweight="bold"
-            )
-            
-            # Ajuste de layout
-            fig.tight_layout(rect=[0, 0, 0.95, 1])
-            
-            # Guardar figura
-            fig.savefig(
-                f'./outputs/MultipathError_{sta.filename}.jpg',
-                dpi=300,
-                bbox_inches='tight',
-                facecolor='0.9'
-            )
-            
-            plt.close(fig)
+    # Corregir ambiguity by segment
+    dfSTA['MP1_corr'] = dfSTA.groupby(['sv','segment'])['MP1'].transform(
+                        lambda x: x - x.mean()  )
+                
+    # Convert from meters to ns
+    dfSTA['MP1_corr'] = dfSTA['MP1_corr'] * 3.33564095 
+    
+    # Crear figura y ejes
+    fig, axs = plt.subplots(
+        nrows=1,
+        ncols=3,
+        figsize=(18, 5),
+        dpi=200,
+        facecolor='white'
+    )
+    
+    # --- Subplot 1: MP1_corr vs MJD ---
+    axs[0].plot(dfSTA['MJD'], dfSTA['MP1_corr'], 'k.')
+    axs[0].set_xlabel('MJD', fontsize=14)
+    axs[0].set_ylabel('L1 Multipath Error / ns', fontsize=14)
+    axs[0].set_ylim([-5, 5])
+    axs[0].grid(True)
+    
+    axs[1].plot(dfSTA['elevation'], dfSTA['MP1_corr'], 'k.')
+    axs[1].set_xlabel('Elevation / degrees', fontsize=14)
+    axs[1].set_ylabel('L1 Multipath Error / ns', fontsize=14)
+    axs[1].set_ylim([-5, 5])
+    axs[1].grid(True)
+    
+    axs[2].hist(
+        dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'],
+        bins=30,
+        alpha=0.7
+    )
+    axs[2].set_xlabel('L1 Multipath Error / ns', fontsize=14)
+    axs[2].set_ylabel('Occurrence', fontsize=14)
+    axs[2].grid(True)
+    
+    fig.text(
+        0.98, 0.5,
+        f'GNSS_cal_tools \n Computed at: {st} UTC-3',
+        rotation=90,
+        va='center',
+        ha='right',
+        fontweight="bold"
+    )
+    
+    fig.tight_layout(rect=[0, 0, 0.95, 1])
+    
+    fig.savefig(
+        f'./outputs/MultipathError_{sta.filename}.jpg',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='0.9'
+    )
+    
+    plt.close(fig)
 
-            
-            MP1_mean = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].mean()
-            MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
+    
+    MP1_mean = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].mean()
+    MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
 
-            sta['MP1_mean'] = float(MP1_mean)
-            sta['MP1_std'] = float(MP1_std)
+    sta['MP1_mean'] = float(MP1_mean)
+    sta['MP1_std'] = float(MP1_std)
 
     return (dfSTA, sta)
 
+def multipathE(dfSTA,config,sta,st):
+    
+    """
+    Calculate multipath error for Galileo E1 observations.
+    
+    Uses linear combination of code and phase observables to isolate multipath effects
+    by eliminating geometric, ionospheric, and clock terms.
+    
+    https://ieeexplore.ieee.org/document/8316317
+    https://www.nature.com/articles/s44172-025-00355-z
+    
+    Parameters:
+    -----------
+    dfSTA : DataFrame
+        DataFrame containing RINEX observations for a station.
+        Must include columns: 'C1', 'P1', 'P2' (pseudoranges on L1, P1 and P2)
+    config : dict
+        Configuration dictionary with processing parameters.
+        Must contain: 'plot_mp_errors' (bool) and 'SYS' (GNSS system)
+    
+    Returns:
+    --------
+    DataFrame
+        Original DataFrame with additional 'MP1' column containing
+        multipath error in nanoseconds
+    """
+   
+    # Constants Galileo            
+    f1, f2 = 1575.42e6, 1176.45e6  # Hz
+    c = 299792458 # m/s
+    l1 = c / f1 # wavelength E1 in m
+    l2 = c / f2 # wavelength E5 in m
 
+    alpha = (f1/f2)**2
+    K1 = 1 + 2/(alpha - 1)  #
+    K2 = 2/(alpha - 1)      #
+    
+
+    # # Corrects phase slips
+    dfSTA['GF'] = dfSTA['L1C']*l1 - dfSTA['L5Q']*l2
+    dfSTA['GF_diff'] = dfSTA.groupby('sv')['GF'].diff().abs()
+    
+    # slip if GF over 0.05 m 
+    slip_threshold = l1 / 4
+    dfSTA['slip'] = dfSTA['GF_diff'] > slip_threshold
+    
+    # Create Segment
+    dfSTA['segment'] = dfSTA.groupby('sv')['slip'].cumsum()
+    
+    # Calculate MP1
+    dfSTA['MP1'] = dfSTA['E1'] - K1*dfSTA['L1C']*l1 + K2*dfSTA['L5Q']*l2
+
+    # Corregir ambiguity by segment
+    dfSTA['MP1_corr'] = dfSTA.groupby(['sv','segment'])['MP1'].transform(
+                        lambda x: x - x.mean()  )
+                
+    # Convert from meters to ns
+    dfSTA['MP1_corr'] = dfSTA['MP1_corr'] * 3.33564095 
+    
+    # Crear figura y ejes
+    fig, axs = plt.subplots(
+        nrows=1,
+        ncols=3,
+        figsize=(18, 5),
+        dpi=200,
+        facecolor='white'
+    )
+    
+    # --- Subplot 1: MP1_corr vs MJD ---
+    axs[0].plot(dfSTA['MJD'], dfSTA['MP1_corr'], 'k.')
+    axs[0].set_xlabel('MJD', fontsize=14)
+    axs[0].set_ylabel('E1 Multipath Error / ns', fontsize=14)
+    axs[0].set_ylim([-5, 5])
+    axs[0].grid(True)
+    
+    axs[1].plot(dfSTA['elevation'], dfSTA['MP1_corr'], 'k.')
+    axs[1].set_xlabel('Elevation / degrees', fontsize=14)
+    axs[1].set_ylabel('E1 Multipath Error / ns', fontsize=14)
+    axs[1].set_ylim([-5, 5])
+    axs[1].grid(True)
+    
+    axs[2].hist(
+        dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'],
+        bins=30,
+        alpha=0.7
+    )
+    axs[2].set_xlabel('E1 Multipath Error / ns', fontsize=14)
+    axs[2].set_ylabel('Occurrence', fontsize=14)
+    axs[2].grid(True)
+    
+    fig.text(
+        0.98, 0.5,
+        f'GNSS_cal_tools \n Computed at: {st} UTC-3',
+        rotation=90,
+        va='center',
+        ha='right',
+        fontweight="bold"
+    )
+    
+    fig.tight_layout(rect=[0, 0, 0.95, 1])
+    
+    fig.savefig(
+        f'./outputs/MultipathError_{sta.filename}.jpg',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='0.9'
+    )
+    
+    plt.close(fig)
+
+    
+    MP1_mean = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].mean()
+    MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
+
+    sta['MP1_mean'] = float(MP1_mean)
+    sta['MP1_std'] = float(MP1_std)
+
+    return (dfSTA, sta)
 
 def APOcorrection(pos,sta_hdr):
     
@@ -277,7 +386,7 @@ def loader(file,config):
                 dataset = dataset.rename({"C2W": "P2"})
             if config['SYS'] == 'E':
                 dataset = gr.load(file, use=config['SYS'],
-                                  meas=['C1C', 'C5Q'])
+                                  meas=['C1C', 'C5Q', 'L5Q','L1C'])
                 dataset = dataset.rename({"C1C": "E1"})
                 dataset = dataset.rename({"C5Q": "E5"})                
 
@@ -763,6 +872,27 @@ def outputsE(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         print('Not the same data interval')
         
 
+    if config['plot_mp_errors']:
+        print(
+            f"Mean and stdev of E1 Multipath Error in {sta1.filename}: "
+            f"({round(float(sta1.MP1_mean), 2)} +/- "
+            f"{round(float(sta1.MP1_std), 2)}) ns\n"
+            f"Mean and stdev of E1 Multipath Error in {sta2.filename}: "
+            f"({round(float(sta2.MP1_mean), 2)} +/- "
+            f"{round(float(sta2.MP1_std), 2)}) ns\n"
+                )
+        file_sum.write(
+        f"Mean and stdev of E1 Multipath Error in {sta1.filename}: "
+        f"({round(float(sta1.MP1_mean), 2)} +/- "
+        f"{round(float(sta1.MP1_std), 2)}) ns\n"
+        f"Mean and stdev of E1 Multipath Error in {sta2.filename}: "
+        f"({round(float(sta2.MP1_mean), 2)} +/- "
+        f"{round(float(sta2.MP1_std), 2)}) ns\n\n"
+        )
+
+
+
+
     pop1 = dif.groupby(['MJD']).median()
 
     rawdiff = {
@@ -787,13 +917,16 @@ def outputsE(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     file_sum.close()
 
 
-    cols_a_exportar = dif[['MJD','sv', 'E1_corr', 'E5_corr']].copy()
-    cols_a_exportar.columns = ['MJD', 'sv', 'E1', 'E5']
+    cols_a_exportar = dif[['MJD', 'sv', 'E1_corr', 'E5_corr', 'elevation']].copy()
+    cols_a_exportar.columns = ['MJD', 'sv', 'E1', 'E5', 'elevation']
     cols_a_exportar['E1'] = cols_a_exportar['E1']/0.299792458
     cols_a_exportar['E5'] = cols_a_exportar['E5']/0.299792458
     cols_a_exportar['MJD'] = cols_a_exportar['MJD'].map(lambda x: f"{x:.5f}")
     cols_a_exportar['E1']  = cols_a_exportar['E1'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['E5']  = cols_a_exportar['E5'].map(lambda x: f"{x:.2f}")
+    cols_a_exportar['elevation']  = cols_a_exportar['elevation'].map(lambda x: f"{x:.1f}")
+
+    
     cols_a_exportar.to_csv( './outputs/' + filename + '_measurementsGalileo.txt', sep='\t', index=False)
     
 

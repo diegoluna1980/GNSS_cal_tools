@@ -17,12 +17,9 @@ from conf import (config, file_a, file_b, file_nav, pos_a, pos_b, delays_a,
 from GNSS_cal_tools_subs import (
     OExyz, dfSTAgen, dfNAVgen, C1P1, outputsG, outputsE,
     ElevationReject, figuresG, figuresE, loader, calibration, DIFgenG, DIFgenE,
-    APOcorrection, multipath
+    APOcorrection, multipathG, multipathE
 )
 
-# Limitations:
-# Only one RINEX file per station
-# No LZ files (the case when the two receivers don't have the same reference)
 
 # Start time
 start_time = time.time()
@@ -81,8 +78,13 @@ df_sta_b = ElevationReject(df_sta_b, pos_b, config, sta_b.filename, st)
 
 #Add Multipath Error estimation https://ieeexplore.ieee.org/document/8316317
 # https://www.nature.com/articles/s44172-025-00355-z
-df_sta_a, sta_a = multipath(df_sta_a, config, sta_a, st)
-df_sta_b, sta_b = multipath(df_sta_b, config, sta_b, st)
+if config['plot_mp_errors']:
+    if config['SYS'] == 'G' :
+        df_sta_a, sta_a = multipathG(df_sta_a, config, sta_a, st)
+        df_sta_b, sta_b = multipathG(df_sta_b, config, sta_b, st)
+    if config['SYS'] == 'E' :
+        df_sta_a, sta_a = multipathE(df_sta_a, config, sta_a, st)
+        df_sta_b, sta_b = multipathE(df_sta_b, config, sta_b, st)
 
 
 # Add C1P1 bias
