@@ -65,58 +65,46 @@ dist = np.linalg.norm(x)
 first_occurrence_idx = dfnav.groupby('sv').apply(lambda x: x.index[0])
 dfnav_first = dfnav.loc[first_occurrence_idx]
 
-
 # Adding of EARTH FIXED COORDINATES (subroutine OExyz of dclrinex)
 # and removing unhealthy satellites
 df_sta_a = OExyz(dfnav_first, df_sta_a, sta_a.filename)
 df_sta_b = OExyz(dfnav_first, df_sta_b, sta_b.filename)
 
-
 # Rejection at low elevation (line 1554 of dclrinex)
 df_sta_a = ElevationReject(df_sta_a, pos_a, config, sta_a.filename, st)
 df_sta_b = ElevationReject(df_sta_b, pos_b, config, sta_b.filename, st)
 
-#Add Multipath Error estimation https://ieeexplore.ieee.org/document/8316317
-# https://www.nature.com/articles/s44172-025-00355-z
-if config['plot_mp_errors']:
-    if config['SYS'] == 'G' :
+if config['SYS'] == 'G':
+    if config['plot_mp_errors']:
+        #Add Multipath Error estimation https://ieeexplore.ieee.org/document/8316317
+        # https://www.nature.com/articles/s44172-025-00355-z
         df_sta_a, sta_a = multipathG(df_sta_a, config, sta_a, st)
         df_sta_b, sta_b = multipathG(df_sta_b, config, sta_b, st)
-    if config['SYS'] == 'E' :
-        df_sta_a, sta_a = multipathE(df_sta_a, config, sta_a, st)
-        df_sta_b, sta_b = multipathE(df_sta_b, config, sta_b, st)
 
-
-# Add C1P1 bias
-if config['SYS'] == 'G':
+    # Add C1P1 bias
     sta_a = C1P1(sta_a,df_sta_a)
     sta_b = C1P1(sta_b,df_sta_b)
-
-# Generation of differences, text Outputs and rawdif calculation.
-# rawdiff = a - b
-
-if config['SYS'] == 'G':
+    
     dif = DIFgenG(df_sta_a, df_sta_b, config, pos_a, pos_b)
     rawdiff = outputsG(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
  
+    if config['calculate_delays']:
+        delays_b = calibration(rawdiff, delays_a, delays_b, sta_a, sta_b)
+        
+    figuresG(dif, config, ts, sta_a, sta_b)
+
 if config['SYS'] == 'E':
+    if config['plot_mp_errors']:
+        #Add Multipath Error estimation https://ieeexplore.ieee.org/document/8316317
+        # https://www.nature.com/articles/s44172-025-00355-z
+        df_sta_a, sta_a = multipathE(df_sta_a, config, sta_a, st)
+        df_sta_b, sta_b = multipathE(df_sta_b, config, sta_b, st)
+        
     dif = DIFgenE(df_sta_a, df_sta_b, config, pos_a, pos_b)
     rawdiff = outputsE(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
-
-
-# Results of calibration (optional)
-if config['calculate_delays'] and config['SYS'] == 'G':
-    delays_b = calibration(rawdiff, delays_a, delays_b, sta_a, sta_b)
-
-# Figure Outputs
-if config['SYS'] == 'G':
-    figuresG(dif, config, ts, sta_a, sta_b)
-if config['SYS'] == 'E':
+    
     figuresE(dif, config, ts, sta_a, sta_b)
-
 
 # Stop time
 stop_time = time.time()
 print(f"Execution time: {stop_time - start_time:.4f} seconds")
-
-
