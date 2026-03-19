@@ -68,8 +68,8 @@ def multipathG(dfSTA,config,sta,st):
     dfSTA['GF'] = dfSTA['L1C']*l1 - dfSTA['L2W']*l2
     dfSTA['GF_diff'] = dfSTA.groupby('sv')['GF'].diff().abs()
     
-    # slip if GF over 0.05 m 
-    slip_threshold = l1 / 4
+    # slip  
+    slip_threshold = l1 / 2
     dfSTA['slip'] = dfSTA['GF_diff'] > slip_threshold
     
     # Create Segment
@@ -128,7 +128,7 @@ def multipathG(dfSTA,config,sta,st):
     fig.tight_layout(rect=[0, 0, 0.95, 1])
     
     fig.savefig(
-        f'./outputs/MultipathError_{sta.filename}.jpg',
+        f'./outputs/MultipathError_{sta.filename}_G.jpg',
         dpi=300,
         bbox_inches='tight',
         facecolor='0.9'
@@ -247,7 +247,7 @@ def multipathE(dfSTA,config,sta,st):
     fig.tight_layout(rect=[0, 0, 0.95, 1])
     
     fig.savefig(
-        f'./outputs/MultipathError_{sta.filename}.jpg',
+        f'./outputs/MultipathError_{sta.filename}_E.jpg',
         dpi=300,
         bbox_inches='tight',
         facecolor='0.9'
@@ -263,6 +263,111 @@ def multipathE(dfSTA,config,sta,st):
     sta['MP1_std'] = float(MP1_std)
 
     return (dfSTA, sta)
+
+
+def multipathC(dfSTA, config, sta, st):
+
+    """
+    Calculate multipath error for BeiDou B1I observations.
+
+    Uses B1I (1561.098 MHz) and B2I (1207.14 MHz).
+
+    Required columns:
+        'C2I', 'L2I', 'L7I'
+    """
+
+    # Frequencies (BDS-2 / compatible signals)
+    f1 = 1561.098e6   # B1I
+    f2 = 1207.14e6    # B2I
+
+    c = 299792458
+    l1 = c / f1
+    l2 = c / f2
+
+    alpha = (f1 / f2) ** 2
+    K1 = 1 + 2 / (alpha - 1)
+    K2 = 2 / (alpha - 1)
+
+    # Geometry-free combination (cycle slip detection)
+    dfSTA['GF'] = dfSTA['L2I'] * l1 - dfSTA['L7I'] * l2
+    dfSTA['GF_diff'] = dfSTA.groupby('sv')['GF'].diff().abs()
+
+    slip_threshold = l1 / 4
+    dfSTA['slip'] = dfSTA['GF_diff'] > slip_threshold
+
+    # Segment arcs
+    dfSTA['segment'] = dfSTA.groupby('sv')['slip'].cumsum()
+
+    # Multipath combination (MP1 for B1I)
+    dfSTA['MP1'] = dfSTA['C2I'] - K1 * dfSTA['L2I'] * l1 + K2 * dfSTA['L7I'] * l2
+
+    # Remove ambiguity per arc
+    dfSTA['MP1_corr'] = dfSTA.groupby(['sv', 'segment'])['MP1'].transform(
+        lambda x: x - x.mean()
+    )
+
+    # Convert meters → ns
+    dfSTA['MP1_corr'] = dfSTA['MP1_corr'] * 3.33564095
+
+    # --- Plotting ---
+    fig, axs = plt.subplots(
+        nrows=1,
+        ncols=3,
+        figsize=(18, 5),
+        dpi=200,
+        facecolor='white'
+    )
+
+    axs[0].plot(dfSTA['MJD'], dfSTA['MP1_corr'], 'k.')
+    axs[0].set_xlabel('MJD', fontsize=14)
+    axs[0].set_ylabel('B1I Multipath Error / ns', fontsize=14)
+    axs[0].set_ylim([-5, 5])
+    axs[0].grid(True)
+
+    axs[1].plot(dfSTA['elevation'], dfSTA['MP1_corr'], 'k.')
+    axs[1].set_xlabel('Elevation / degrees', fontsize=14)
+    axs[1].set_ylabel('B1I Multipath Error / ns', fontsize=14)
+    axs[1].set_ylim([-5, 5])
+    axs[1].grid(True)
+
+    axs[2].hist(
+        dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'],
+        bins=30,
+        alpha=0.7
+    )
+    axs[2].set_xlabel('B1I Multipath Error / ns', fontsize=14)
+    axs[2].set_ylabel('Occurrence', fontsize=14)
+    axs[2].grid(True)
+
+    fig.text(
+        0.98, 0.5,
+        f'GNSS_cal_tools \n Computed at: {st} UTC-3',
+        rotation=90,
+        va='center',
+        ha='right',
+        fontweight="bold"
+    )
+
+    fig.tight_layout(rect=[0, 0, 0.95, 1])
+
+    fig.savefig(
+        f'./outputs/MultipathError_{sta.filename}_C.jpg',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='0.9'
+    )
+
+    plt.close(fig)
+
+    # Statistics
+    MP1_mean = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].mean()
+    MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
+
+    sta['MP1_mean'] = float(MP1_mean)
+    sta['MP1_std'] = float(MP1_std)
+
+    return (dfSTA, sta)
+
 
 def APOcorrection(pos,sta_hdr):
     
@@ -389,12 +494,119 @@ def loader(file,config):
                                   meas=['C1C', 'C5Q', 'L5Q','L1C'])
                 dataset = dataset.rename({"C1C": "E1"})
                 dataset = dataset.rename({"C5Q": "E5"})                
-
+            if config['SYS'] == 'C':
+                dataset = gr.load(file, use=config['SYS'],
+                                  meas=['C2I', 'L2I', 'L7I','C7I'])
         else:
             dataset = gr.load(file, use=config['SYS'], meas=['C1', 'P1', 'P2'])
 
 
     return(dataset, file_hdr)
+
+def figuresC(dif, config, ts, sta_a, sta_b):
+    
+    """
+    Generates plots of time series and TDEV for BeiDou signals:
+    B1I (C2I) and B2I (L7I).
+    """
+    
+    if config['timeplots']:
+
+        # meters → ns
+        k = 0.299792458
+        
+        MJD = dif.MJD.unique()
+        pop1 = dif.groupby(['MJD']).median()
+        
+        # Convert to ns
+        B1 = pop1['C2I_corr'].to_numpy() / k
+        B2 = pop1['C7I_corr'].to_numpy() / k
+        #B2 = pop1['L7I_corr'].to_numpy() / k
+        
+        # --- TDEV ---
+        (B1_tau_tdev, B1_tdev, B1_tdeverr, n_tdev) = allantools.tdev(
+            B1, rate=1/config['intcod'], data_type="phase", taus='octave'
+        )
+        
+        (B2_tau_tdev, B2_tdev, B2_tdeverr, n_tdev) = allantools.tdev(
+            B2, rate=1/config['intcod'], data_type="phase", taus='octave'
+        )
+        
+        # --- Figure ---
+        fig1 = plt.figure(1, figsize=(12, 8))
+        plt.subplots_adjust(hspace=.3)
+        
+        # Timestamp
+        plt.figtext(
+            0.95, 0.5,
+            'Computed at: ' + datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S') + ' UTC-3\n',
+            rotation=90
+        )
+        
+        plt.figtext(
+            0.05, 0.01,
+            'Raw differences of ' + sta_a.filename + ' - ' + sta_b.filename
+        )
+        
+        # --- B1 time series ---
+        plt.subplot(221)
+        plt.plot(MJD, B1, 'b.', markeredgewidth=0.0, zorder=4, label='B1')
+        plt.title('Median: (' + str(round(np.median(B1), 2)) +
+                  '+/-' + str(round(B1.std(), 2)) + ') ns')
+        plt.ylabel('Time / ns', size=14)
+        plt.xlabel('MJD', size=14)
+        plt.legend(loc=0, prop={'size': 12}, framealpha=1)
+        plt.grid(linestyle='dashed')
+        plt.xticks(rotation=30, size=12)
+        plt.yticks(size=12)
+        xx, _ = plt.xticks()
+        plt.xticks(xx, ['%.0f' % a for a in xx])
+        plt.tick_params(direction="in")
+
+        # --- B2 time series ---
+        plt.subplot(222)
+        plt.plot(MJD, B2, 'b.', markeredgewidth=0.0, zorder=4, label='B2')
+        plt.title('Median: (' + str(round(np.median(B2), 2)) +
+                  '+/-' + str(round(B2.std(), 2)) + ') ns')
+        plt.xlabel('MJD', size=14)
+        plt.legend(loc=0, prop={'size': 12}, framealpha=1)
+        plt.grid(linestyle='dashed')
+        plt.xticks(rotation=30, size=12)
+        plt.yticks(size=12)
+        xx, _ = plt.xticks()
+        plt.xticks(xx, ['%.0f' % a for a in xx])
+        plt.tick_params(direction="in")
+
+        # --- TDEV B1 ---
+        plt.subplot(223)
+        plt.loglog(B1_tau_tdev, B1_tdev, '-ko', markeredgewidth=0.0, zorder=4)
+        plt.axhline(y=0.1, color='r', linestyle='--')
+        plt.ylabel('Time deviation / ns', size=14)
+        plt.xlabel('Time / s', size=14)
+        plt.grid(linestyle='dashed')
+        plt.tick_params(direction="in")
+        plt.xticks(size=12)
+        plt.yticks(size=12)
+
+        # --- TDEV B2 ---
+        plt.subplot(224)
+        plt.loglog(B2_tau_tdev, B2_tdev, '-ko', markeredgewidth=0.0, zorder=4)
+        plt.axhline(y=0.1, color='r', linestyle='--')
+        plt.xlabel('Time / s', size=14)
+        plt.grid(linestyle='dashed')
+        plt.tick_params(direction="in")
+        plt.xticks(size=12)
+        plt.yticks(size=12)
+
+        # --- Save ---
+        plt.suptitle('B1 and B2 plots - GNSS_cal_tools.py',
+                     fontsize=16, fontweight='bold')
+
+        destino = './outputs/B1B2plots_' + sta_a.filename + '_' + sta_b.filename + '.pdf'
+
+        fig1.savefig(destino, facecolor='0.9', dpi=200)
+        plt.close()
+
 
 def figuresE(dif, config, ts, sta_a, sta_b):
     
@@ -523,12 +735,6 @@ def figuresE(dif, config, ts, sta_a, sta_b):
         plt.close()
 
 
-
-
-
-
-
-
 def figuresG(dif,config,ts, sta_a, sta_b):
     
     """
@@ -587,7 +793,8 @@ def figuresG(dif,config,ts, sta_a, sta_b):
         
         # Add timestamp to right margin
         plt.figtext(0.95, 0.5,  'Computed at: ' + datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S') + ' UTC-3\n', rotation=90)
-        
+        plt.figtext(0.05,0.01,'Rawdifferences of ' + sta_a.filename + ' - ' + sta_b.filename)
+
         # Plot time series for C1        
         plt.subplot(231)
         plt.plot(MJD, C1, 'b.',markeredgewidth=0.0,zorder=4,label='C1')
@@ -749,6 +956,87 @@ def DIFgenE(dfSTA1, dfSTA2, config, pos1, pos2):
     return dif[['MJD', 'sv', 'X', 'Y', 'Z', 'elevation', 'E1', 'E5', 'E1_corr', 'E5_corr']]
 
 
+def DIFgenC(dfSTA1, dfSTA2, config, pos1, pos2):
+    """
+    Computes observation differences between two stations for BeiDou signals
+    using C2I, L2I, L7I observables.
+
+    Parameters
+    ----------
+    dfSTA1 : pd.DataFrame
+        Must include 'MJD', 'sv', 'C2I', 'L2I', 'L7I', 'X', 'Y', 'Z', 'elevation'
+    dfSTA2 : pd.DataFrame
+        Must include 'MJD', 'sv', 'C2I', 'L2I', 'L7I'
+    config : dict
+        Must include 'intcod'
+    pos1, pos2 : np.ndarray
+        Station coordinates (ECEF)
+
+    Returns
+    -------
+    pd.DataFrame
+    """
+
+    codint = config['intcod'] / 86400  # days
+
+    # Time binning
+    dfSTA1['MJD_bin'] = (dfSTA1['MJD'] / codint).round() * codint
+    dfSTA2['MJD_bin'] = (dfSTA2['MJD'] / codint).round() * codint
+
+    grp_cols = ['MJD_bin', 'sv']
+
+    agg_cols1 = ['C7I', 'C2I', 'L2I', 'L7I', 'X', 'Y', 'Z', 'elevation']
+    agg_cols2 = ['C7I', 'C2I', 'L2I', 'L7I']
+
+    dat1 = dfSTA1.groupby(grp_cols)[agg_cols1].median().reset_index()
+    dat2 = dfSTA2.groupby(grp_cols)[agg_cols2].median().reset_index()
+
+    # Merge
+    dif = pd.merge(dat1, dat2, on=grp_cols, suffixes=('_1', '_2'))
+
+    # Differences
+    dif['C7I'] = dif['C7I_1'] - dif['C7I_2']
+    dif['C2I'] = dif['C2I_1'] - dif['C2I_2']
+    dif['L2I'] = dif['L2I_1'] - dif['L2I_2']
+    dif['L7I'] = dif['L7I_1'] - dif['L7I_2']
+
+    # Dual-frequency combination (phase difference)
+    dif['L2I-L7I'] = dif['L2I'] - dif['L7I']
+
+    # --- Outlier rejection ---
+    dif = dif[(dif[['C2I', 'L2I', 'L7I']].abs() <= 300).all(axis=1)]
+    dif = dif[dif['L2I-L7I'].abs() <= 30]
+
+    # MAD filter
+    def mad_filter(col, u=3):
+        med = col.median()
+        mad = 1.4826 * np.median(np.abs(col - med))
+        return (col - med).abs() <= u * mad
+
+    for col in ['C7I', 'C2I', 'L2I', 'L7I']:
+        dif = dif[mad_filter(dif[col])]
+
+    # --- Geometry correction ---
+    x = pos2 - pos1
+
+    xsat = dif['X'] - pos1[0]
+    ysat = dif['Y'] - pos1[1]
+    zsat = dif['Z'] - pos1[2]
+
+    r = np.sqrt(xsat**2 + ysat**2 + zsat**2)
+
+    corg = (x[0]*xsat + x[1]*ysat + x[2]*zsat) / r
+
+    dif['C7I_corr'] = dif['C7I'] - corg
+    dif['C2I_corr'] = dif['C2I'] - corg
+    dif['L2I_corr'] = dif['L2I'] - corg
+    dif['L7I_corr'] = dif['L7I'] - corg
+
+    dif = dif.rename(columns={'MJD_bin': 'MJD'})
+
+    return dif[['MJD', 'sv', 'X', 'Y', 'Z', 'elevation',
+                'C2I', 'L2I', 'L7I', 'L2I-L7I', 'C7I',
+                'C2I_corr', 'L2I_corr', 'L7I_corr','C7I_corr']]
 
 def DIFgenG(dfSTA1, dfSTA2, config, pos1, pos2):
     """
@@ -833,7 +1121,7 @@ def outputsE(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     # Open file
     filename = sta1.filename.partition(".")[0] + sta2.filename.partition(".")[0]
-    file_sum = open('./outputs/' + filename + '_resultsGalileo.txt', 'w')
+    file_sum = open('./outputs/' + filename + '_results_E.txt', 'w')
     
     file_sum.write(
     f" GNSS_cal_tools Version: {VERSION}\n"
@@ -927,7 +1215,7 @@ def outputsE(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     cols_a_exportar['elevation']  = cols_a_exportar['elevation'].map(lambda x: f"{x:.1f}")
 
     
-    cols_a_exportar.to_csv( './outputs/' + filename + '_measurementsGalileo.txt', sep='\t', index=False)
+    cols_a_exportar.to_csv( './outputs/' + filename + '_measurements_E.txt', sep='\t', index=False)
     
 
     return(rawdiff)
@@ -937,7 +1225,7 @@ def outputsG(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     # Open file
     filename = sta1.filename.partition(".")[0] + sta2.filename.partition(".")[0]
-    file_sum = open('./outputs/' + filename + '_results.txt', 'w')
+    file_sum = open('./outputs/' + filename + '_results_GPS.txt', 'w')
     
     file_sum.write(
     f" GNSS_cal_tools Version: {VERSION}\n"
@@ -987,9 +1275,6 @@ def outputsG(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         
         
     )
-
-
-
 
 
     print(
@@ -1060,10 +1345,116 @@ def outputsG(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     cols_a_exportar['P2']  = cols_a_exportar['P2'].map(lambda x: f"{x:.2f}")
     cols_a_exportar['elevation']  = cols_a_exportar['elevation'].map(lambda x: f"{x:.1f}")
 
-    cols_a_exportar.to_csv( './outputs/' + filename + '_measurements.txt', sep='\t', index=False)
+    cols_a_exportar.to_csv( './outputs/' + filename + '_measurements_GPS.txt', sep='\t', index=False)
     
 
     return(rawdiff)
+
+def outputsC(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
+
+    # Open file
+    filename = sta1.filename.partition(".")[0] + sta2.filename.partition(".")[0]
+    file_sum = open('./outputs/' + filename + '_results_C.txt', 'w')
+    
+    file_sum.write(
+    f" GNSS_cal_tools Version: {VERSION}\n"
+    f"Processing date and time: {st} UTC-3\n"
+    f"Output interval (s) = {config['intcod']}\n"
+    f"Code threshold (ns) = {config['ithr']}\n"
+    f"Residual threshold (m) = {config['thres']}\n"
+    f"Processed system: {config['SYS']}. (GPS:G, Galileo:E, Glonass:R, Beidou:C)\n"
+    f"Min Elevation (deg): {config['elmin']}\n\n"
+    f"INPUT FILES\n"
+    f" {file_nav}\tRINEX version: {nav.version}\n"
+    f" {sta1.filename}\tRINEX version: {sta1.version}\n"
+    f" {sta2.filename}\tRINEX version: {sta2.version}\n\n"
+    )
+
+    file_sum.write(
+    f"Distance from headers is {dist:.2f} m\n"
+    f"Interval of {sta1.filename} is {sta1.interval} s\n"
+    f"Interval of {sta2.filename} is {sta2.interval} s\n\n"
+    )
+
+    print(
+        f"Distance read from headers is: {dist:.2f} m\n"
+        f"Interval of file1 is {sta1.interval} s\n"
+        f"Interval of file2 is {sta2.interval} s"
+    )
+
+    if dist > 1000:
+        file_sum.write(f'WARNING: Distance read from headers is {dist} m!\n')
+        print(f'WARNING: Distance read from headers is {dist} m!')
+    
+    if sta1.interval != sta2.interval:
+        file_sum.write('Not the same data interval\n')
+        print('Not the same data interval')
+
+    # --- Multipath stats ---
+    if config['plot_mp_errors']:
+        print(
+            f"Mean and stdev of B1I Multipath Error in {sta1.filename}: "
+            f"({round(float(sta1.MP1_mean), 2)} +/- "
+            f"{round(float(sta1.MP1_std), 2)}) ns\n"
+            f"Mean and stdev of B1I Multipath Error in {sta2.filename}: "
+            f"({round(float(sta2.MP1_mean), 2)} +/- "
+            f"{round(float(sta2.MP1_std), 2)}) ns\n"
+        )
+        file_sum.write(
+        f"Mean and stdev of B1I Multipath Error in {sta1.filename}: "
+        f"({round(float(sta1.MP1_mean), 2)} +/- "
+        f"{round(float(sta1.MP1_std), 2)}) ns\n"
+        f"Mean and stdev of B1I Multipath Error in {sta2.filename}: "
+        f"({round(float(sta2.MP1_mean), 2)} +/- "
+        f"{round(float(sta2.MP1_std), 2)}) ns\n\n"
+        )
+
+    # Convert to meters
+    l7 = 299792458 / 1207.14e6
+    dif['L7I_corr'] = dif['L7I_corr'] * l7
+    # --- Statistics ---
+    pop1 = dif.groupby(['MJD']).median()
+
+    rawdiff = {
+        'medianB1': round(pop1['C2I_corr'].median() / 0.299792458, 2),
+        'stdB1': round(pop1['C2I_corr'].std() / 0.299792458, 2),
+        'medianB2': round(pop1['C7I_corr'].median() / 0.299792458, 2),
+        'stdB2': round(pop1['C7I_corr'].std() / 0.299792458, 2),
+    }
+
+    file_sum.write(
+    f"Median and stdev of B1I difference: ({rawdiff['medianB1']} +/- {rawdiff['stdB1']}) ns\n"
+    f"Median and stdev of B2I difference: ({rawdiff['medianB2']} +/- {rawdiff['stdB2']}) ns\n"
+    )
+
+    print(
+        f"Median and stdev of B1I difference: ({rawdiff['medianB1']} +/- {rawdiff['stdB1']}) ns\n"
+        f"Median and stdev of B2I difference: ({rawdiff['medianB2']} +/- {rawdiff['stdB2']}) ns\n"
+    )
+
+    file_sum.close()
+
+    # --- Export measurements ---
+    cols_a_exportar = dif[['MJD', 'sv', 'C2I_corr', 'C7I_corr', 'elevation']].copy()
+    cols_a_exportar.columns = ['MJD', 'sv', 'B1', 'B2', 'elevation']
+
+    cols_a_exportar['B1'] = cols_a_exportar['B1'] / 0.299792458
+    cols_a_exportar['B2'] = cols_a_exportar['B2']# / 0.299792458
+
+    cols_a_exportar['MJD'] = cols_a_exportar['MJD'].map(lambda x: f"{x:.5f}")
+    cols_a_exportar['B1']  = cols_a_exportar['B1'].map(lambda x: f"{x:.2f}")
+    cols_a_exportar['B2']  = cols_a_exportar['B2'].map(lambda x: f"{x:.2f}")
+    cols_a_exportar['elevation'] = cols_a_exportar['elevation'].map(lambda x: f"{x:.1f}")
+
+    cols_a_exportar.to_csv(
+        './outputs/' + filename + '_measurements_C.txt',
+        sep='\t',
+        index=False
+    )
+
+    return rawdiff
+
+
 
 def ElevationReject(dfSTA,pos,config,name,st):
     """
@@ -1191,7 +1582,7 @@ def ElevationReject(dfSTA,pos,config,name,st):
         ax.set_rlim(90, 0)
         ax.set_rlabel_position(180)
         ax.set_title(f'{name} – Skyplot', va='bottom', fontweight='bold')
-        plt.savefig(f'./outputs/Skyplot_{name}.png', dpi=100, bbox_inches='tight',facecolor='0.9')
+        plt.savefig(f'./outputs/Skyplot_{name}' + '_' + config['SYS'] + '.png', dpi=100, bbox_inches='tight',facecolor='0.9')
         plt.close()
 
     return(dfSTA)
@@ -1202,7 +1593,7 @@ def C1P1(sta,df_sta):
     sta['c1p1_bias_std'] = c1p1_diff.std()  
     return(sta)
 
-def OExyz(dfnav_first, dfSTA, stafilename):
+def OExyz(dfnav_first, dfSTA, stafilename,config):
     
     """
      Computes satellite positions in Earth-Centered, Earth-Fixed (ECEF) coordinates 
@@ -1340,11 +1731,17 @@ def OExyz(dfnav_first, dfSTA, stafilename):
     
     
     # Remove unhealthy satellites
-    unhealthy_count = sum(dfSTA['health'] != 0)
-    healthy_count = sum(dfSTA['health'] == 0)
-    print(f'Unhealthy/healthy sats in {stafilename}: {unhealthy_count}/{healthy_count}')
+    if config['SYS'] == 'C':
+        unhealthy_count = sum(dfSTA['SatH1'] != 0)
+        healthy_count = sum(dfSTA['SatH1'] == 0)
+        print(f'Unhealthy/healthy sats in {stafilename}: {unhealthy_count}/{healthy_count}')
+        dfSTA = dfSTA[dfSTA['SatH1'] == 0]
 
-    dfSTA = dfSTA[dfSTA['health'] == 0]
+    else:
+        unhealthy_count = sum(dfSTA['health'] != 0)
+        healthy_count = sum(dfSTA['health'] == 0)
+        print(f'Unhealthy/healthy sats in {stafilename}: {unhealthy_count}/{healthy_count}')
+        dfSTA = dfSTA[dfSTA['health'] == 0]
 
     return(dfSTA)
 
@@ -1366,7 +1763,7 @@ def dfSTAgen(STA):
         
     return(dfSTA)
 
-def dfNAVgen(nav):
+def dfNAVgen(nav,config):
     # Generation of dataframes
     dfnav = nav.to_dataframe()
 
@@ -1376,11 +1773,17 @@ def dfNAVgen(nav):
     # Resetting indexes
     dfnav = dfnav.reset_index()
     
-    # Remove unhealthy satellites
-    unhealthy_count = sum(dfnav['health'] != 0)
-    healthy_count = sum(dfnav['health'] == 0)
-    dfnav = dfnav[dfnav['health'] == 0]
-    print(f'Unhealthy/healthy sats in {nav.filename}: {unhealthy_count}/{healthy_count}')
+    # Remove unhealthy 
+    if config['SYS'] == 'C':
+        unhealthy_count = sum(dfnav['SatH1'] != 0)
+        healthy_count = sum(dfnav['SatH1'] == 0)
+        dfnav = dfnav[dfnav['SatH1'] == 0]
+        print(f'Unhealthy/healthy sats in {nav.filename}: {unhealthy_count}/{healthy_count}')
+    else:    
+        unhealthy_count = sum(dfnav['health'] != 0)
+        healthy_count = sum(dfnav['health'] == 0)
+        dfnav = dfnav[dfnav['health'] == 0]
+        print(f'Unhealthy/healthy sats in {nav.filename}: {unhealthy_count}/{healthy_count}')
 
     #Remove satellites with clock drift bigger than 1e-11
     #dfnav = dfnav[dfnav['SVclockDrift'].abs() < 1e-11]
