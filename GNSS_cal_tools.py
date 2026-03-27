@@ -109,8 +109,6 @@ if config['SYS'] == 'C':
     rawdiff = outputsC(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
     figuresC(dif, config, ts, sta_a, sta_b)
 
-
-
 # Stop time
 stop_time = time.time()
 print(f"Execution time: {stop_time - start_time:.4f} seconds")

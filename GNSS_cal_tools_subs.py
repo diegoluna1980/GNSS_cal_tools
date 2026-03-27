@@ -143,6 +143,7 @@ def multipathG(dfSTA,config,sta,st):
     sta['MP1_mean'] = float(MP1_mean)
     sta['MP1_std'] = float(MP1_std)
 
+
     return (dfSTA, sta)
 
 def multipathE(dfSTA,config,sta,st):
@@ -1527,62 +1528,118 @@ def ElevationReject(dfSTA,pos,config,name,st):
 
     # Generate elevation histogram if enabled in config
     if config['plotelevations']:
-        
-        # Set up the figure 
-        plt.figure(figsize=(12, 8), dpi=200)  # High resolution
-        sns.set_style("white")  # Clean background
+    
+        sns.set_style("white")
         sns.set_context("paper", font_scale=1.4)
-
-        # Create histogram (bins: 0-95 in steps of 5)
-        bins = np.arange(0, 100, 5)  # 0-95 in steps of 5
-        sns.histplot(data = dfSTA['elevation'],
-                      bins=bins,
-                      color='steelblue',
-                      edgecolor='white',
-                      linewidth=1.2,
-                      alpha=0.85
-                      )
-
-        # Customize the plot
-        plt.title(name, pad=20, fontweight='bold')
-        plt.xlabel('Elevation / degrees', labelpad=10)
-        plt.ylabel('Number of satellites', labelpad=10)
-        plt.xticks(bins, rotation=45)
-        plt.xlim(0, 95)  
-        plt.grid(axis='y', alpha=0.3)
-        plt.grid(axis='x', alpha=0.1)
-        plt.tight_layout()
-
-
-        # Add timestamp to right margin
-        plt.figtext(1.05, 0.3,  'GNSS_cal_tools \n Computed at: ' + st + ' UTC-3\n',
-                    rotation=90,fontweight="bold",  ha='right')
-
-
-
-        # Save image and show plot
-        plt.savefig('./outputs/Elevation_' + name + 'histogram.pdf', dpi=200,
-                    bbox_inches='tight',facecolor='0.9')
-        #plt.show()
-        plt.close()
+    
+        # Crear figura con 2x2 subplots
+        fig, axs = plt.subplots(2, 2, figsize=(14, 10), dpi=200)
         
-        plt.figure(figsize=(12, 8), dpi=200, facecolor='white')
+        # -------------------------
+        # (0,0) Elevation histogram
+        # -------------------------
+        ax1 = axs[0, 0]
+    
+        bins = np.arange(0, 100, 5)
+    
+        sns.histplot(
+            data=dfSTA['elevation'],
+            bins=bins,
+            color='steelblue',
+            edgecolor='white',
+            linewidth=1.2,
+            alpha=0.85,
+            ax=ax1
+        )
+    
+        ax1.set_title(name, fontweight='bold')
+        ax1.set_xlabel('Elevation / degrees')
+        ax1.set_ylabel('Number of satellites')
+        ax1.set_xticks(bins)
+        ax1.set_xticklabels(bins, rotation=45)
+        ax1.set_xlim(0, 95)
+        ax1.grid(axis='y', alpha=0.3)
+        ax1.grid(axis='x', alpha=0.1)
+    
+        # -------------------------
+        # (0,1) SKYPLOT (polar)
+        # -------------------------
 
-        # Add timestamp to right margin
-        plt.figtext(0.85, 0.4,  'GNSS_cal_tools \n Computed at: ' + st + ' UTC-3\n',
-                    rotation=90,  fontweight="bold",  ha='right')
-
-        ax = plt.subplot(111, polar=True, label = config['SYS'])
-        ax.set_theta_zero_location('N')  # 0° at North
-        ax.set_theta_direction(-1)       # Clockwise
+        fig.delaxes(axs[0,1])
+        ax2 = fig.add_subplot(2, 2, 2, projection='polar')
+    
+        ax2.set_theta_zero_location('N')
+        ax2.set_theta_direction(-1)
+    
         theta = np.radians(dfSTA['azimuth'])
-        r = dfSTA['elevation']      # Elevation from zenith
-        ax.scatter(theta, r, s=1)
-        #ax.scatter(theta, r, c=dfSTA['MP1'], cmap='viridis', s=1)
-        ax.set_rlim(90, 0)
-        ax.set_rlabel_position(180)
-        ax.set_title(f'{name} – Skyplot', va='bottom', fontweight='bold')
-        plt.savefig(f'./outputs/Skyplot_{name}' + '_' + config['SYS'] + '.png', dpi=100, bbox_inches='tight',facecolor='0.9')
+        r = dfSTA['elevation']
+    
+        ax2.scatter(theta, r, s=1)
+    
+        ax2.set_rlim(90, 0)
+        ax2.set_rlabel_position(180)
+        ax2.set_title(f'{name} – Skyplot', fontweight='bold')
+    
+    
+        # -------------------------
+        # (1,0) OBS vs MJD
+        # -------------------------
+        ax3 = axs[1, 0]
+        
+        # Conteo de observaciones por MJD
+        obs_per_mjd = dfSTA.groupby('MJD').size()
+        
+        ax3.plot(obs_per_mjd.index, obs_per_mjd.values, linewidth=1)
+        
+        ax3.set_title('Observations per epoch', fontweight='bold')
+        ax3.set_xlabel('MJD')
+        ax3.set_ylabel('Number of observations')
+        ax3.grid(alpha=0.3)
+            
+        # -------------------------
+        # Eliminar subplots vacíos
+        # -------------------------
+        #fig.delaxes(axs[1, 1])
+    
+            # -------------------------
+        # (1,1) Elevation vs MJD
+        # -------------------------
+        ax4 = axs[1, 1]
+        
+        sc = ax4.scatter(
+            dfSTA['MJD'],
+            dfSTA['elevation'],
+            s=1,
+            alpha=0.5
+        )
+        
+        ax4.set_title('Elevation vs MJD', fontweight='bold')
+        ax4.set_xlabel('MJD')
+        ax4.set_ylabel('Elevation (deg)')
+        ax4.set_ylim(0, 90)
+        ax4.grid(alpha=0.3)
+    
+    
+    
+        fig.text(
+            0.98, 0.5,
+            'GNSS_cal_tools\nComputed at: ' + st + ' UTC-3',
+            rotation=90,
+            fontweight="bold",
+            ha='right',
+            va='center'
+        )
+    
+        # Ajuste layout
+        plt.tight_layout()
+    
+        plt.savefig(
+            f'./outputs/Elevation_Skyplot_{name}_{config["SYS"]}.png',
+            dpi=100,
+            bbox_inches='tight',
+            facecolor='0.9'
+        )
+    
         plt.close()
 
     return(dfSTA)

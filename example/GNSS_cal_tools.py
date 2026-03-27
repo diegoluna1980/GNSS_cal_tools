@@ -15,14 +15,11 @@ from conf import (config, file_a, file_b, file_nav, pos_a, pos_b, delays_a,
 )
 
 from GNSS_cal_tools_subs import (
-    OExyz, dfSTAgen, dfNAVgen, C1P1, outputs,
-    ElevationReject, figures, loader, calibration, DIFgen1,
-    APOcorrection, multipath
+    OExyz, dfSTAgen, dfNAVgen, C1P1, outputsG, outputsE, outputsC,
+    ElevationReject, figuresG, figuresE, figuresC, loader, calibration,
+    DIFgenG, DIFgenE,DIFgenC, APOcorrection, multipathG, multipathE, multipathC
 )
 
-# Limitations:
-# Only one RINEX file per station
-# No LZ files (the case when the two receivers don't have the same reference)
 
 # Start time
 start_time = time.time()
@@ -53,7 +50,7 @@ print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE\n')
 # Generation of dataframes
 df_sta_a = dfSTAgen(sta_a)
 df_sta_b = dfSTAgen(sta_b)
-dfnav = dfNAVgen(nav)
+dfnav = dfNAVgen(nav,config)
 
 # Apply Antenna Phase offsets correction of RECEIVER
 pos_a = APOcorrection(pos_a,sta_a_hdr)
@@ -68,45 +65,50 @@ dist = np.linalg.norm(x)
 first_occurrence_idx = dfnav.groupby('sv').apply(lambda x: x.index[0])
 dfnav_first = dfnav.loc[first_occurrence_idx]
 
-
 # Adding of EARTH FIXED COORDINATES (subroutine OExyz of dclrinex)
 # and removing unhealthy satellites
-df_sta_a = OExyz(dfnav_first, df_sta_a, sta_a.filename)
-df_sta_b = OExyz(dfnav_first, df_sta_b, sta_b.filename)
-
+df_sta_a = OExyz(dfnav_first, df_sta_a, sta_a.filename, config)
+df_sta_b = OExyz(dfnav_first, df_sta_b, sta_b.filename, config)
 
 # Rejection at low elevation (line 1554 of dclrinex)
 df_sta_a = ElevationReject(df_sta_a, pos_a, config, sta_a.filename, st)
 df_sta_b = ElevationReject(df_sta_b, pos_b, config, sta_b.filename, st)
 
-#Add Multipath Error estimation https://ieeexplore.ieee.org/document/8316317
-# https://www.nature.com/articles/s44172-025-00355-z
-df_sta_a, sta_a = multipath(df_sta_a, config, sta_a, st)
-df_sta_b, sta_b = multipath(df_sta_b, config, sta_b, st)
+if config['SYS'] == 'G':
+    if config['plot_mp_errors']:
+        df_sta_a, sta_a = multipathG(df_sta_a, config, sta_a, st)
+        df_sta_b, sta_b = multipathG(df_sta_b, config, sta_b, st)
 
+    # Add C1P1 bias
+    sta_a = C1P1(sta_a,df_sta_a)
+    sta_b = C1P1(sta_b,df_sta_b)
+    
+    dif = DIFgenG(df_sta_a, df_sta_b, config, pos_a, pos_b)
+    rawdiff = outputsG(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
+ 
+    if config['calculate_delays']:
+        delays_b = calibration(rawdiff, delays_a, delays_b, sta_a, sta_b)
+        
+    figuresG(dif, config, ts, sta_a, sta_b)
 
-# Add C1P1 bias
-sta_a = C1P1(sta_a,df_sta_a)
-sta_b = C1P1(sta_b,df_sta_b)
+if config['SYS'] == 'E':
+    if config['plot_mp_errors']:
+        df_sta_a, sta_a = multipathE(df_sta_a, config, sta_a, st)
+        df_sta_b, sta_b = multipathE(df_sta_b, config, sta_b, st)
+        
+    dif = DIFgenE(df_sta_a, df_sta_b, config, pos_a, pos_b)
+    rawdiff = outputsE(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
+    figuresE(dif, config, ts, sta_a, sta_b)
 
-# Genero diferencias
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") +
-      ': Creation of dataframe of time differences')  
-dif = DIFgen1(df_sta_a, df_sta_b, config, pos_a, pos_b)
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ': DONE\n')
-
-# Text Outputs and rawdif calculation. rawdiff = a - b
-rawdiff = outputs(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
-
-# Results of calibration (optional)
-if config['calculate_delays']:
-    delays_b = calibration(rawdiff, delays_a, delays_b, sta_a, sta_b)
-
-# Figure Outputs
-figures(dif, config, ts, sta_a, sta_b)
+if config['SYS'] == 'C':
+    if config['plot_mp_errors']:
+        df_sta_a, sta_a = multipathC(df_sta_a, config, sta_a, st)
+        df_sta_b, sta_b = multipathC(df_sta_b, config, sta_b, st)
+        
+    dif = DIFgenC(df_sta_a, df_sta_b, config, pos_a, pos_b)
+    rawdiff = outputsC(VERSION, st, nav, sta_a, sta_b, file_nav, dist, config, dif)
+    figuresC(dif, config, ts, sta_a, sta_b)
 
 # Stop time
 stop_time = time.time()
 print(f"Execution time: {stop_time - start_time:.4f} seconds")
-
-
