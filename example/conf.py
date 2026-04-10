@@ -8,11 +8,11 @@ Created on Fri Jun  6 14:58:22 2025
 import numpy as np
 
 config = {
-    'elmin': 5,    # [deg] Elevation minimum
+    'elmin': 10,    # [deg] Elevation minimum
     'intcod': 300, # [s] Code average. Default: one code average every 300 s
     'ithr': 20,    # [ns] Default code threshold = 20 ns
     'thres': 0.05, # Option to read residual threshold (L336)
-    'SYS': 'G',    # System to calibrate (GPS:G, Galileo:E, Glonass:R, Beidu:C)
+    'SYS': 'E',    # System to calibrate (GPS:G, Galileo:E, Glonass:R, Beidu:C)
     # PLOT AND CALCULATION OPTIONS
     'plotelevations': True,        # Plot histograms of elevations
     'timeplots': True,             # Plot time differneces and allan deviations
@@ -28,8 +28,8 @@ file_b = 'SIMr2350.24O'  # The station that will be calibrated
 file_nav = 'BRDC00IGS_R_20242350000_01D_MN.rnx'
 
 # # Positions extracted from NRCan PPP solutions
-pos_a = np.array([2765120.876,-4449248.432,-3626403.656]) #ITRF
-pos_b = np.array([2765129.317,-4449242.843,-3626401.964]) #ITRF
+pos_a = np.array([2765120.876,-4449248.434,-3626403.658]) #ITRF
+pos_b = np.array([2765129.282,-4449242.786,-3626401.919]) #ITRF
 
 # # RINEX OBS files
 # file_b = 'BP2100FRA_R_20231750000_01D_30S_MO.rnx' # The DUT station

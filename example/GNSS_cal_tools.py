@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -15,9 +16,10 @@ from conf import (config, file_a, file_b, file_nav, pos_a, pos_b, delays_a,
 )
 
 from GNSS_cal_tools_subs import (
-    OExyz, dfSTAgen, dfNAVgen, C1P1, outputsG, outputsE, outputsC,
+    OExyz, OExyz1,  dfSTAgen, dfNAVgen, C1P1, outputsG, outputsE, outputsC,
     ElevationReject, figuresG, figuresE, figuresC, loader, calibration,
-    DIFgenG, DIFgenE,DIFgenC, APOcorrection, multipathG, multipathE, multipathC
+    DIFgenG, DIFgenE,DIFgenC, ARPcorrection, multipathG, multipathE,
+    multipathC
 )
 
 
@@ -52,9 +54,9 @@ df_sta_a = dfSTAgen(sta_a)
 df_sta_b = dfSTAgen(sta_b)
 dfnav = dfNAVgen(nav,config)
 
-# Apply Antenna Phase offsets correction of RECEIVER
-pos_a = APOcorrection(pos_a,sta_a_hdr)
-pos_b = APOcorrection(pos_b,sta_b_hdr)
+# Apply Antenna Reference Point correction of RECEIVER
+pos_a = ARPcorrection(pos_a,sta_a_hdr)
+pos_b = ARPcorrection(pos_b,sta_b_hdr)
 
 # Positions, distance and interval
 x = pos_b - pos_a
@@ -67,12 +69,13 @@ dfnav_first = dfnav.loc[first_occurrence_idx]
 
 # Adding of EARTH FIXED COORDINATES (subroutine OExyz of dclrinex)
 # and removing unhealthy satellites
-df_sta_a = OExyz(dfnav_first, df_sta_a, sta_a.filename, config)
-df_sta_b = OExyz(dfnav_first, df_sta_b, sta_b.filename, config)
+df_sta_a = OExyz1(dfnav_first, df_sta_a, sta_a.filename, config)
+df_sta_b = OExyz1(dfnav_first, df_sta_b, sta_b.filename, config)
 
 # Rejection at low elevation (line 1554 of dclrinex)
 df_sta_a = ElevationReject(df_sta_a, pos_a, config, sta_a.filename, st)
 df_sta_b = ElevationReject(df_sta_b, pos_b, config, sta_b.filename, st)
+
 
 if config['SYS'] == 'G':
     if config['plot_mp_errors']:

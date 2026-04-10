@@ -76,45 +76,118 @@ def multipathG(dfSTA,config,sta,st):
     dfSTA['segment'] = dfSTA.groupby('sv')['slip'].cumsum()
     
     # Calculate MP1
-    dfSTA['MP1'] = dfSTA['C1'] - K1*dfSTA['L1C']*l1 + K2*dfSTA['L2W']*l2
+    dfSTA['MP1'] = dfSTA['P1'] - K1*dfSTA['L1C']*l1 + K2*dfSTA['L2W']*l2
 
     # Corregir ambiguity by segment
+    dfSTA['MP1_corr'] =  dfSTA['MP1']
     dfSTA['MP1_corr'] = dfSTA.groupby(['sv','segment'])['MP1'].transform(
-                        lambda x: x - x.mean()  )
+                         lambda x: x - x.mean()  )
                 
     # Convert from meters to ns
     dfSTA['MP1_corr'] = dfSTA['MP1_corr'] * 3.33564095 
     
-    # Crear figura y ejes
+ 
+    K1_MP2 = 2*alpha/(alpha - 1)
+    K2_MP2 = K1_MP2 - 1
+
+    dfSTA['MP2'] = dfSTA['P2'] - K1_MP2*dfSTA['L1C']*l1 + K2_MP2*dfSTA['L2W']*l2
+ 
+    # Correct ambiguity by segment (same segments as MP1, based on slips)
+    # dfSTA['MP2_corr'] =  dfSTA['MP2']
+    dfSTA['MP2_corr'] = dfSTA.groupby(['sv','segment'])['MP2'].transform(
+                        lambda x: x - x.mean()
+                       )
+    
+    # Convert from meters to ns
+    dfSTA['MP2_corr'] = dfSTA['MP2_corr'] * 3.33564095
+    
+
+    MP1_median = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].median()
+    MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
+
+    MP2_median = dfSTA.loc[dfSTA['MP2_corr'].abs() < 5, 'MP2_corr'].median()
+    MP2_std = dfSTA.loc[dfSTA['MP2_corr'].abs() < 5, 'MP2_corr'].std()
+
+    sta['MP1_median'] = float(MP1_median)
+    sta['MP1_std'] = float(MP1_std)
+    sta['MP2_median'] = float(MP2_median)
+    sta['MP2_std'] = float(MP2_std)
+
+
+
+
+    # Crear figura y ejes (2 filas x 3 columnas)
     fig, axs = plt.subplots(
-        nrows=1,
+        nrows=2,
         ncols=3,
-        figsize=(18, 5),
+        figsize=(18, 10),
         dpi=200,
         facecolor='white'
     )
     
-    # --- Subplot 1: MP1_corr vs MJD ---
-    axs[0].plot(dfSTA['MJD'], dfSTA['MP1_corr'], 'k.')
-    axs[0].set_xlabel('MJD', fontsize=14)
-    axs[0].set_ylabel('L1 Multipath Error / ns', fontsize=14)
-    axs[0].set_ylim([-5, 5])
-    axs[0].grid(True)
+    # =========================
+    # ====== FILA 1: MP1 ======
+    # =========================
     
-    axs[1].plot(dfSTA['elevation'], dfSTA['MP1_corr'], 'k.')
-    axs[1].set_xlabel('Elevation / degrees', fontsize=14)
-    axs[1].set_ylabel('L1 Multipath Error / ns', fontsize=14)
-    axs[1].set_ylim([-5, 5])
-    axs[1].grid(True)
+    # MP1 vs MJD
+    axs[0, 0].plot(dfSTA['MJD'], dfSTA['MP1_corr'], 'k.')
+    axs[0, 0].set_xlabel('MJD', fontsize=14)
+    axs[0, 0].set_ylabel('L1 Multipath Error / ns', fontsize=14)
+    axs[0, 0].set_ylim([-5, 5])
+    axs[0, 0].grid(True)
     
-    axs[2].hist(
+    # MP1 vs Elevation
+    axs[0, 1].plot(dfSTA['elevation'], dfSTA['MP1_corr'], 'k.')
+    axs[0, 1].set_xlabel('Elevation / degrees', fontsize=14)
+    axs[0, 1].set_ylabel('L1 Multipath Error / ns', fontsize=14)
+    axs[0, 1].set_ylim([-5, 5])
+    axs[0, 1].grid(True)
+    
+    # Histograma MP1
+    axs[0, 2].hist(
         dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'],
         bins=30,
         alpha=0.7
     )
-    axs[2].set_xlabel('L1 Multipath Error / ns', fontsize=14)
-    axs[2].set_ylabel('Occurrence', fontsize=14)
-    axs[2].grid(True)
+    axs[0, 2].set_title(f"MP1 median: {round(float(MP1_median), 3)} ns", fontweight='bold')
+    axs[0, 2].set_xlabel('L1 Multipath Error / ns', fontsize=14)
+    axs[0, 2].set_ylabel('Occurrence', fontsize=14)
+    axs[0, 2].grid(True)
+    
+    
+    # =========================
+    # ====== FILA 2: MP2 ======
+    # =========================
+
+    # MP2 vs MJD
+    axs[1, 0].plot(dfSTA['MJD'], dfSTA['MP2_corr'], 'k.')
+    axs[1, 0].set_xlabel('MJD', fontsize=14)
+    axs[1, 0].set_ylabel('L2 Multipath Error / ns', fontsize=14)
+    axs[1, 0].set_ylim([-5, 5])
+    axs[1, 0].grid(True)
+    
+    # MP2 vs Elevation
+    axs[1, 1].plot(dfSTA['elevation'], dfSTA['MP2_corr'], 'k.')
+    axs[1, 1].set_xlabel('Elevation / degrees', fontsize=14)
+    axs[1, 1].set_ylabel('L2 Multipath Error / ns', fontsize=14)
+    axs[1, 1].set_ylim([-5, 5])
+    axs[1, 1].grid(True)
+    
+    # Histograma MP2
+    axs[1, 2].hist(
+        dfSTA.loc[dfSTA['MP2_corr'].abs() < 5, 'MP2_corr'],
+        bins=30,
+        alpha=0.7
+    )
+    axs[1, 2].set_title(f"MP2 median: {round(float(MP2_median), 3)} ns", fontweight='bold')
+    axs[1, 2].set_xlabel('L2 Multipath Error / ns', fontsize=14)
+    axs[1, 2].set_ylabel('Occurrence', fontsize=14)
+    axs[1, 2].grid(True)
+
+    
+    # =========================
+    # ===== Texto lateral =====
+    # =========================
     
     fig.text(
         0.98, 0.5,
@@ -125,24 +198,18 @@ def multipathG(dfSTA,config,sta,st):
         fontweight="bold"
     )
     
+    # Ajuste layout
     fig.tight_layout(rect=[0, 0, 0.95, 1])
     
+    # Guardar figura
     fig.savefig(
         f'./outputs/MultipathError_{sta.filename}_G.jpg',
         dpi=300,
         bbox_inches='tight',
         facecolor='0.9'
     )
-    
+
     plt.close(fig)
-
-    
-    MP1_mean = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].mean()
-    MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
-
-    sta['MP1_mean'] = float(MP1_mean)
-    sta['MP1_std'] = float(MP1_std)
-
 
     return (dfSTA, sta)
 
@@ -174,18 +241,18 @@ def multipathE(dfSTA,config,sta,st):
     """
    
     # Constants Galileo            
-    f1, f2 = 1575.42e6, 1176.45e6  # Hz
+    f1, f5 = 1575.42e6, 1176.45e6  # Hz
     c = 299792458 # m/s
     l1 = c / f1 # wavelength E1 in m
-    l2 = c / f2 # wavelength E5 in m
+    l5 = c / f5 # wavelength E5 in m
 
-    alpha = (f1/f2)**2
+    alpha = (f1/f5)**2
     K1 = 1 + 2/(alpha - 1)  #
     K2 = 2/(alpha - 1)      #
     
 
     # # Corrects phase slips
-    dfSTA['GF'] = dfSTA['L1C']*l1 - dfSTA['L5Q']*l2
+    dfSTA['GF'] = dfSTA['L1C']*l1 - dfSTA['L5Q']*l5
     dfSTA['GF_diff'] = dfSTA.groupby('sv')['GF'].diff().abs()
     
     # slip if GF over 0.05 m 
@@ -195,46 +262,112 @@ def multipathE(dfSTA,config,sta,st):
     # Create Segment
     dfSTA['segment'] = dfSTA.groupby('sv')['slip'].cumsum()
     
-    # Calculate MP1
-    dfSTA['MP1'] = dfSTA['E1'] - K1*dfSTA['L1C']*l1 + K2*dfSTA['L5Q']*l2
-
+    # MP1 (E1)
+    K1 = 1 + 2/(alpha - 1)
+    K2 = 2/(alpha - 1)
+    dfSTA['MP1'] = dfSTA['E1'] - K1*dfSTA['L1C']*l1 + K2*dfSTA['L5Q']*l5
+    
+    # MP5 (E5a)
+    K1_MP5 = 2*alpha/(alpha - 1)
+    K2_MP5 = K1_MP5 - 1
+    dfSTA['MP5'] = dfSTA['E5'] - K1_MP5*dfSTA['L1C']*l1 + K2_MP5*dfSTA['L5Q']*l5
+    
     # Corregir ambiguity by segment
     dfSTA['MP1_corr'] = dfSTA.groupby(['sv','segment'])['MP1'].transform(
                         lambda x: x - x.mean()  )
-                
+    
+    dfSTA['MP5_corr'] = dfSTA.groupby(['sv','segment'])['MP5'].transform(
+                        lambda x: x - x.mean()  )
+            
     # Convert from meters to ns
     dfSTA['MP1_corr'] = dfSTA['MP1_corr'] * 3.33564095 
+    dfSTA['MP5_corr'] = dfSTA['MP5_corr'] * 3.33564095 
     
-    # Crear figura y ejes
+    
+    MP1_median = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].median()
+    MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
+
+    MP5_median = dfSTA.loc[dfSTA['MP5_corr'].abs() < 5, 'MP5_corr'].median()
+    MP5_std = dfSTA.loc[dfSTA['MP5_corr'].abs() < 5, 'MP5_corr'].std()
+
+    sta['MP1_median'] = float(MP1_median)
+    sta['MP1_std'] = float(MP1_std)
+    sta['MP5_median'] = float(MP5_median)
+    sta['MP5_std'] = float(MP5_std)
+
+     
+    # Crear figura y ejes (2 filas x 3 columnas)
     fig, axs = plt.subplots(
-        nrows=1,
+        nrows=2,
         ncols=3,
-        figsize=(18, 5),
+        figsize=(18, 10),
         dpi=200,
         facecolor='white'
     )
     
-    # --- Subplot 1: MP1_corr vs MJD ---
-    axs[0].plot(dfSTA['MJD'], dfSTA['MP1_corr'], 'k.')
-    axs[0].set_xlabel('MJD', fontsize=14)
-    axs[0].set_ylabel('E1 Multipath Error / ns', fontsize=14)
-    axs[0].set_ylim([-5, 5])
-    axs[0].grid(True)
+    # =========================
+    # ====== FILA 1: MP1 ======
+    # =========================
     
-    axs[1].plot(dfSTA['elevation'], dfSTA['MP1_corr'], 'k.')
-    axs[1].set_xlabel('Elevation / degrees', fontsize=14)
-    axs[1].set_ylabel('E1 Multipath Error / ns', fontsize=14)
-    axs[1].set_ylim([-5, 5])
-    axs[1].grid(True)
+    # MP1 vs MJD
+    axs[0, 0].plot(dfSTA['MJD'], dfSTA['MP1_corr'], 'k.')
+    axs[0, 0].set_xlabel('MJD', fontsize=14)
+    axs[0, 0].set_ylabel('E1 Multipath Error / ns', fontsize=14)
+    axs[0, 0].set_ylim([-5, 5])
+    axs[0, 0].grid(True)
     
-    axs[2].hist(
+    # MP1 vs Elevation
+    axs[0, 1].plot(dfSTA['elevation'], dfSTA['MP1_corr'], 'k.')
+    axs[0, 1].set_xlabel('Elevation / degrees', fontsize=14)
+    axs[0, 1].set_ylabel('L1 Multipath Error / ns', fontsize=14)
+    axs[0, 1].set_ylim([-5, 5])
+    axs[0, 1].grid(True)
+    
+    # Histograma MP1
+    axs[0, 2].hist(
         dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'],
         bins=30,
         alpha=0.7
     )
-    axs[2].set_xlabel('E1 Multipath Error / ns', fontsize=14)
-    axs[2].set_ylabel('Occurrence', fontsize=14)
-    axs[2].grid(True)
+    axs[0, 2].set_title(f"MP1 median: {round(float(MP1_median), 3)} ns", fontweight='bold')
+    axs[0, 2].set_xlabel('L1 Multipath Error / ns', fontsize=14)
+    axs[0, 2].set_ylabel('Occurrence', fontsize=14)
+    axs[0, 2].grid(True)
+    
+    
+    # =========================
+    # ====== FILA 2: MP2 ======
+    # =========================
+
+    # MP2 vs MJD
+    axs[1, 0].plot(dfSTA['MJD'], dfSTA['MP5_corr'], 'k.')
+    axs[1, 0].set_xlabel('MJD', fontsize=14)
+    axs[1, 0].set_ylabel('E5 Multipath Error / ns', fontsize=14)
+    axs[1, 0].set_ylim([-5, 5])
+    axs[1, 0].grid(True)
+    
+    # MP2 vs Elevation
+    axs[1, 1].plot(dfSTA['elevation'], dfSTA['MP5_corr'], 'k.')
+    axs[1, 1].set_xlabel('Elevation / degrees', fontsize=14)
+    axs[1, 1].set_ylabel('E5 Multipath Error / ns', fontsize=14)
+    axs[1, 1].set_ylim([-5, 5])
+    axs[1, 1].grid(True)
+    
+    # Histograma MP2
+    axs[1, 2].hist(
+        dfSTA.loc[dfSTA['MP5_corr'].abs() < 5, 'MP5_corr'],
+        bins=30,
+        alpha=0.7
+    )
+    axs[1, 2].set_title(f"MP5 median: {round(float(MP5_median), 3)} ns", fontweight='bold')
+    axs[1, 2].set_xlabel('E5 Multipath Error / ns', fontsize=14)
+    axs[1, 2].set_ylabel('Occurrence', fontsize=14)
+    axs[1, 2].grid(True)
+
+    
+    # =========================
+    # ===== Texto lateral =====
+    # =========================
     
     fig.text(
         0.98, 0.5,
@@ -245,22 +378,24 @@ def multipathE(dfSTA,config,sta,st):
         fontweight="bold"
     )
     
+    # Ajuste layout
     fig.tight_layout(rect=[0, 0, 0.95, 1])
     
+    # Guardar figura
     fig.savefig(
         f'./outputs/MultipathError_{sta.filename}_E.jpg',
         dpi=300,
         bbox_inches='tight',
         facecolor='0.9'
     )
-    
+
     plt.close(fig)
 
     
-    MP1_mean = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].mean()
+    MP1_median = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].median()
     MP1_std = dfSTA.loc[dfSTA['MP1_corr'].abs() < 5, 'MP1_corr'].std()
 
-    sta['MP1_mean'] = float(MP1_mean)
+    sta['MP1_median'] = float(MP1_median)
     sta['MP1_std'] = float(MP1_std)
 
     return (dfSTA, sta)
@@ -370,7 +505,7 @@ def multipathC(dfSTA, config, sta, st):
     return (dfSTA, sta)
 
 
-def APOcorrection(pos,sta_hdr):
+def ARPcorrection(pos,sta_hdr):
     
     # Define transformations
     crs_ecef = CRS.from_epsg(4978)   # ECEF (WGS84)
@@ -378,10 +513,10 @@ def APOcorrection(pos,sta_hdr):
     transformer = Transformer.from_crs(crs_ecef, crs_geo, always_xy=True)
     lon, lat, h = transformer.transform(pos[0], pos[1],pos[2])
 
-    APO_str = sta_hdr['ANTENNA: DELTA H/E/N']
+    ARP_str = sta_hdr['ANTENNA: DELTA H/E/N']
     
     # Phase center offset (ENU frame)
-    u_offset, e_offset, n_offset = [float(x) for x in APO_str.split() if x]
+    u_offset, e_offset, n_offset = [float(x) for x in ARP_str.split() if x]
 
     # Convert to radians
     lat_rad, lon_rad = np.radians(lat), np.radians(lon)
@@ -915,10 +1050,30 @@ def DIFgenE(dfSTA1, dfSTA2, config, pos1, pos2):
     # Median values per (MJD_bin, sv) for both stations
     grp_cols = ['MJD_bin', 'sv']
     agg_cols1 = ['E1', 'E5', 'X', 'Y', 'Z', 'elevation']
-    agg_cols2 = ['E1', 'E5']
+    agg_cols2 = ['E1', 'E5','elevation']
 
-    dat1 = dfSTA1.groupby(grp_cols)[agg_cols1].median().reset_index()
-    dat2 = dfSTA2.groupby(grp_cols)[agg_cols2].median().reset_index()
+
+    # Use weighed means
+    def apply_weighted_mean(df, group_cols, agg_cols):
+        """Apply weighted mean using sin(elevation)**2 as weights."""
+        def weighted_mean(group):
+            w = np.sin(np.radians(group['elevation'])**2)
+            if w.sum() == 0:
+                w = np.ones(len(group)) / len(group)
+            return pd.Series({
+                col: np.average(group[col], weights=w) 
+                for col in agg_cols
+            })
+        
+        return df.groupby(group_cols).apply(weighted_mean).reset_index()
+
+
+    dat1 = apply_weighted_mean(dfSTA1, grp_cols, agg_cols1)
+    dat2 = apply_weighted_mean(dfSTA2, grp_cols, agg_cols2)
+
+    # Use medians
+    # dat1 = dfSTA1.groupby(grp_cols)[agg_cols1].median().reset_index()
+    # dat2 = dfSTA2.groupby(grp_cols)[agg_cols2].median().reset_index()
 
     # Merge aligned records
     dif = pd.merge(dat1, dat2, on=grp_cols, suffixes=('_1', '_2'))
@@ -951,7 +1106,8 @@ def DIFgenE(dfSTA1, dfSTA2, config, pos1, pos2):
     dif['E5_corr'] = dif['E5'] - corg
 
     dif = dif.rename(columns={'MJD_bin': 'MJD'})
-    
+    dif = dif.rename(columns={'elevation_1': 'elevation'})
+
     # Keep only relevant columns
     
     return dif[['MJD', 'sv', 'X', 'Y', 'Z', 'elevation', 'E1', 'E5', 'E1_corr', 'E5_corr']]
@@ -987,10 +1143,31 @@ def DIFgenC(dfSTA1, dfSTA2, config, pos1, pos2):
     grp_cols = ['MJD_bin', 'sv']
 
     agg_cols1 = ['C7I', 'C2I', 'L2I', 'L7I', 'X', 'Y', 'Z', 'elevation']
-    agg_cols2 = ['C7I', 'C2I', 'L2I', 'L7I']
+    agg_cols2 = ['C7I', 'C2I', 'L2I', 'L7I','elevation']
 
-    dat1 = dfSTA1.groupby(grp_cols)[agg_cols1].median().reset_index()
-    dat2 = dfSTA2.groupby(grp_cols)[agg_cols2].median().reset_index()
+
+    # Use weighed means
+    def apply_weighted_mean(df, group_cols, agg_cols):
+        """Apply weighted mean using sin(elevation)**2 as weights."""
+        def weighted_mean(group):
+            w = np.sin(np.radians(group['elevation'])**2)
+            if w.sum() == 0:
+                w = np.ones(len(group)) / len(group)
+            return pd.Series({
+                col: np.average(group[col], weights=w) 
+                for col in agg_cols
+            })
+        
+        return df.groupby(group_cols).apply(weighted_mean).reset_index()
+
+
+    dat1 = apply_weighted_mean(dfSTA1, grp_cols, agg_cols1)
+    dat2 = apply_weighted_mean(dfSTA2, grp_cols, agg_cols2)
+
+
+    # Use medians
+    # dat1 = dfSTA1.groupby(grp_cols)[agg_cols1].median().reset_index()
+    # dat2 = dfSTA2.groupby(grp_cols)[agg_cols2].median().reset_index()
 
     # Merge
     dif = pd.merge(dat1, dat2, on=grp_cols, suffixes=('_1', '_2'))
@@ -1034,6 +1211,7 @@ def DIFgenC(dfSTA1, dfSTA2, config, pos1, pos2):
     dif['L7I_corr'] = dif['L7I'] - corg
 
     dif = dif.rename(columns={'MJD_bin': 'MJD'})
+    dif = dif.rename(columns={'elevation_1': 'elevation'})
 
     return dif[['MJD', 'sv', 'X', 'Y', 'Z', 'elevation',
                 'C2I', 'L2I', 'L7I', 'L2I-L7I', 'C7I',
@@ -1063,22 +1241,59 @@ def DIFgenG(dfSTA1, dfSTA2, config, pos1, pos2):
         DataFrame containing aligned satellite observations, differences and geometry-corrected values.
     """
 
+
     codint = config['intcod'] / 86400  # Convert integration interval to days
 
     # Round MJD to the nearest integration time
-    dfSTA1['MJD_bin'] = (dfSTA1['MJD'] / codint).round() * codint
-    dfSTA2['MJD_bin'] = (dfSTA2['MJD'] / codint).round() * codint
+    #dfSTA1['MJD_bin'] = (dfSTA1['MJD'] / codint).round() * codint
+    #dfSTA2['MJD_bin'] = (dfSTA2['MJD'] / codint).round() * codint
+    
+    # Round MJD to the nearest integration time
+    #factor = 1.0 / codint
+    factor = 86400 / config['intcod']
+    dfSTA1['MJD_bin'] = np.round(dfSTA1['MJD'] * factor) / factor
+    dfSTA2['MJD_bin'] = np.round(dfSTA2['MJD'] * factor) / factor
 
     # Median values per (MJD_bin, sv) for both stations
     grp_cols = ['MJD_bin', 'sv']
     agg_cols1 = ['C1', 'P1', 'P2', 'X', 'Y', 'Z', 'elevation']
-    agg_cols2 = ['C1', 'P1', 'P2']
+    agg_cols2 = ['C1', 'P1', 'P2', 'elevation']
 
-    dat1 = dfSTA1.groupby(grp_cols)[agg_cols1].median().reset_index()
-    dat2 = dfSTA2.groupby(grp_cols)[agg_cols2].median().reset_index()
+
+    # Use weighed means
+    def apply_weighted_mean(df, group_cols, agg_cols):
+        """Apply weighted mean using sin(elevation)**2 as weights."""
+        def weighted_mean(group):
+            w = np.sin(np.radians(group['elevation'])**2)
+            if w.sum() == 0:
+                w = np.ones(len(group)) / len(group)
+            return pd.Series({
+                col: np.average(group[col], weights=w) 
+                for col in agg_cols
+            })
+        
+        return df.groupby(group_cols).apply(weighted_mean).reset_index()
+
+    dat1 = apply_weighted_mean(dfSTA1, grp_cols, agg_cols1)
+    dat2 = apply_weighted_mean(dfSTA2, grp_cols, agg_cols2)
+    
+    # Use the medians
+    #dat1 = dfSTA1.groupby(grp_cols)[agg_cols1].median().reset_index()
+    #dat2 = dfSTA2.groupby(grp_cols)[agg_cols2].median().reset_index()
 
     # Merge aligned records
-    dif = pd.merge(dat1, dat2, on=grp_cols, suffixes=('_1', '_2'))
+    # dif = pd.merge(dat1, dat2, on=grp_cols, suffixes=('_1', '_2'))
+
+    dif = pd.merge_asof(
+        dat1.sort_values('MJD_bin'),
+        dat2.sort_values('MJD_bin'),
+        on='MJD_bin',
+        by='sv',
+        tolerance=codint/2,
+        direction='nearest',
+        suffixes=('_1', '_2')
+    )
+
 
     # Calculate observation differences
     dif['C1'] = dif['C1_1'] - dif['C1_2']
@@ -1090,14 +1305,26 @@ def DIFgenG(dfSTA1, dfSTA2, config, pos1, pos2):
     dif = dif[(dif[['C1', 'P1', 'P2']].abs() <= 300).all(axis=1)]
     dif = dif[dif['P1-P2'].abs() <= 30]
 
-    # Median Absolute Deviation (MAD) filtering
-    def mad_filter(col, u=3):
-        med = col.median()
-        mad = 1.4826 * np.median(np.abs(col - med))
-        return (col - med).abs() <= u * mad
 
-    for col in ['C1', 'P1', 'P2']:
-        dif = dif[mad_filter(dif[col])]
+    # Median Absolute Deviation (MAD) filtering
+    
+    # def mad_filter(col, u=3):
+    #     med = col.median()
+    #     mad = 1.4826 * np.median(np.abs(col - med))
+    #     return (col - med).abs() <= u * mad
+
+    # for col in ['C1', 'P1', 'P2']:
+    #     dif = dif[mad_filter(dif[col])]
+
+    mask = np.ones(len(dif), dtype=bool)
+    
+    for col in ['C1','P1','P2']:
+        med = dif[col].median()
+        mad = 1.4826 * np.median(np.abs(dif[col] - med))
+        mask &= np.abs(dif[col] - med) <= 3 * mad
+    
+    dif = dif[mask]
+
 
     # Geometry correction
     x = pos2 - pos1
@@ -1112,7 +1339,8 @@ def DIFgenG(dfSTA1, dfSTA2, config, pos1, pos2):
     dif['P2_corr'] = dif['P2'] - corg
 
     dif = dif.rename(columns={'MJD_bin': 'MJD'})
-    
+    dif = dif.rename(columns={'elevation_1': 'elevation'})
+
     # Keep only relevant columns
     
     return dif[['MJD', 'sv', 'X', 'Y', 'Z', 'elevation', 'C1', 'P1', 'P2', 'P1-P2', 'C1_corr', 'P1_corr', 'P2_corr']]
@@ -1138,18 +1366,14 @@ def outputsE(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     f" {sta2.filename}\tRINEX version: {sta2.version}\n\n"
     )
 
-
-    file_sum.write(
+    msg = (
     f"Distance from headers is {dist:.2f} m\n"
     f"Interval of {sta1.filename} is {sta1.interval} s\n"
     f"Interval of {sta2.filename} is {sta2.interval} s\n\n"
     )
-
-    print(
-        f"Distance read from headers is: {dist:.2f} m\n"
-        f"Interval of file1 is {sta1.interval} s\n"
-        f"Interval of file2 is {sta2.interval} s"
-    )
+    
+    file_sum.write(msg + "\n")
+    print(msg)
 
 
     if dist > 1000:
@@ -1162,25 +1386,17 @@ def outputsE(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         
 
     if config['plot_mp_errors']:
-        print(
-            f"Mean and stdev of E1 Multipath Error in {sta1.filename}: "
-            f"({round(float(sta1.MP1_mean), 2)} +/- "
+        msg = (
+            f"Median and stdev of E1 Multipath Error in {sta1.filename}: "
+            f"({round(float(sta1.MP1_median), 2)} +/- "
             f"{round(float(sta1.MP1_std), 2)}) ns\n"
-            f"Mean and stdev of E1 Multipath Error in {sta2.filename}: "
-            f"({round(float(sta2.MP1_mean), 2)} +/- "
+            f"Median and stdev of E1 Multipath Error in {sta2.filename}: "
+            f"({round(float(sta2.MP1_median), 2)} +/- "
             f"{round(float(sta2.MP1_std), 2)}) ns\n"
                 )
-        file_sum.write(
-        f"Mean and stdev of E1 Multipath Error in {sta1.filename}: "
-        f"({round(float(sta1.MP1_mean), 2)} +/- "
-        f"{round(float(sta1.MP1_std), 2)}) ns\n"
-        f"Mean and stdev of E1 Multipath Error in {sta2.filename}: "
-        f"({round(float(sta2.MP1_mean), 2)} +/- "
-        f"{round(float(sta2.MP1_std), 2)}) ns\n\n"
-        )
-
-
-
+        
+        print(msg)
+        file_sum.write(msg + "\n")
 
     pop1 = dif.groupby(['MJD']).median()
 
@@ -1191,20 +1407,14 @@ def outputsE(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         'stdE5' : round(pop1['E5_corr'].std()/0.299792458, 2),
         }
 
-
-    file_sum.write(
+    msg = (
     f"Median and stdev of E1 difference: ({rawdiff['medianE1']} +/- {rawdiff['stdE1']}) ns\n"
     f"Median and stdev of E5 difference: ({rawdiff['medianE5']} +/- {rawdiff['stdE5']}) ns\n"
     )
-
-    print(
-        f"Median and stdev of E1 difference: ({rawdiff['medianE1']} +/- {rawdiff['stdE1']}) ns\n"
-        f"Median and stdev of E5 difference: ({rawdiff['medianE5']} +/- {rawdiff['stdE5']}) ns\n"
-    )
-
     
+    print(msg)
+    file_sum.write(msg + "\n")
     file_sum.close()
-
 
     cols_a_exportar = dif[['MJD', 'sv', 'E1_corr', 'E5_corr', 'elevation']].copy()
     cols_a_exportar.columns = ['MJD', 'sv', 'E1', 'E5', 'elevation']
@@ -1242,18 +1452,14 @@ def outputsG(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     f" {sta2.filename}\tRINEX version: {sta2.version}\n\n"
     )
 
-
-    file_sum.write(
+    msg = (
     f"Distance from headers is {dist:.2f} m\n"
     f"Interval of {sta1.filename} is {sta1.interval} s\n"
     f"Interval of {sta2.filename} is {sta2.interval} s\n\n"
     )
-
-    print(
-        f"Distance read from headers is: {dist:.2f} m\n"
-        f"Interval of file1 is {sta1.interval} s\n"
-        f"Interval of file2 is {sta2.interval} s"
-    )
+    
+    file_sum.write(msg + "\n")
+    print(msg)
 
 
     if dist > 1000:
@@ -1264,8 +1470,7 @@ def outputsG(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         file_sum.write('Not the same data interval\n')
         print('Not the same data interval')
     
-    
-    file_sum.write(
+    msg = (
         f"Median and stdev of C1P1 bias in {sta1.filename}: "
         f"({round(sta1['c1p1_bias_median'].values / 0.299792458, 2)} +/- "
         f"{round(sta1['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
@@ -1273,38 +1478,22 @@ def outputsG(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         f"Median and stdev of C1P1 bias in {sta2.filename}: "
         f"({round(sta2['c1p1_bias_median'].values / 0.299792458, 2)} +/- "
         f"{round(sta2['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n\n"
-        
-        
-    )
+        )
 
-
-    print(
-        f"Median and stdev of C1P1 bias in {sta1.filename}: "
-        f"({round(sta1['c1p1_bias_median'].values / 0.299792458, 2)} +/- "
-        f"{round(sta1['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
-        
-        f"Median and stdev of C1P1 bias in {sta2.filename}: "
-        f"({round(sta2['c1p1_bias_median'].values / 0.299792458, 2)} +/- "
-        f"{round(sta2['c1p1_bias_std'].values / 0.299792458, 2)}) ns\n"
-    )
+    file_sum.write(msg + "\n")     
+    print(msg)
 
     if config['plot_mp_errors']:
-        print(
-            f"Mean and stdev of L1 Multipath Error in {sta1.filename}: "
-            f"({round(float(sta1.MP1_mean), 2)} +/- "
-            f"{round(float(sta1.MP1_std), 2)}) ns\n"
-            f"Mean and stdev of L1 Multipath Error in {sta2.filename}: "
-            f"({round(float(sta2.MP1_mean), 2)} +/- "
-            f"{round(float(sta2.MP1_std), 2)}) ns\n"
-                )
-        file_sum.write(
-        f"Mean and stdev of L1 Multipath Error in {sta1.filename}: "
-        f"({round(float(sta1.MP1_mean), 2)} +/- "
-        f"{round(float(sta1.MP1_std), 2)}) ns\n"
-        f"Mean and stdev of L1 Multipath Error in {sta2.filename}: "
-        f"({round(float(sta2.MP1_mean), 2)} +/- "
-        f"{round(float(sta2.MP1_std), 2)}) ns\n\n"
+
+        msg = (
+            f"Median and stdev of L1 Multipath Error in {sta1.filename}: "
+            f"({sta1.MP1_median:.2f} +/- {sta1.MP1_std:.2f}) ns\n"
+            f"Median and stdev of L1 Multipath Error in {sta2.filename}: "
+            f"({sta2.MP1_median:.2f} +/- {sta2.MP1_std:.2f}) ns\n"
         )
+        
+        print(msg)
+        file_sum.write(msg + "\n")        
 
     pop1 = dif.groupby(['MJD']).median()
 
@@ -1319,21 +1508,15 @@ def outputsG(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         }
 
 
-    file_sum.write(
+    msg = (
     f"Median and stdev of C1 difference: ({rawdiff['medianC1']} +/- {rawdiff['stdC1']}) ns\n"
     f"Median and stdev of P1 difference: ({rawdiff['medianP1']} +/- {rawdiff['stdP1']}) ns\n"
     f"Median and stdev of P2 difference: ({rawdiff['medianP2']} +/- {rawdiff['stdP2']}) ns\n"
     )
-
-    print(
-        f"Median and stdev of C1 difference: ({rawdiff['medianC1']} +/- {rawdiff['stdC1']}) ns\n"
-        f"Median and stdev of P1 difference: ({rawdiff['medianP1']} +/- {rawdiff['stdP1']}) ns\n"
-        f"Mean and stdev of P2 difference:   ({rawdiff['medianP2']} +/- {rawdiff['stdP2']}) ns\n"
-    )
-
     
+    print(msg)
+    file_sum.write(msg + "\n")
     file_sum.close()
-
 
     cols_a_exportar = dif[['MJD','sv', 'C1_corr', 'P1_corr', 'P2_corr', 'elevation']].copy()
     cols_a_exportar.columns = ['MJD', 'sv', 'C1', 'P1', 'P2','elevation']
@@ -1348,7 +1531,6 @@ def outputsG(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     cols_a_exportar.to_csv( './outputs/' + filename + '_measurements_GPS.txt', sep='\t', index=False)
     
-
     return(rawdiff)
 
 def outputsC(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
@@ -1371,17 +1553,14 @@ def outputsC(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     f" {sta2.filename}\tRINEX version: {sta2.version}\n\n"
     )
 
-    file_sum.write(
+    msg = (
     f"Distance from headers is {dist:.2f} m\n"
     f"Interval of {sta1.filename} is {sta1.interval} s\n"
     f"Interval of {sta2.filename} is {sta2.interval} s\n\n"
     )
-
-    print(
-        f"Distance read from headers is: {dist:.2f} m\n"
-        f"Interval of file1 is {sta1.interval} s\n"
-        f"Interval of file2 is {sta2.interval} s"
-    )
+    
+    file_sum.write(msg + "\n")
+    print(msg)
 
     if dist > 1000:
         file_sum.write(f'WARNING: Distance read from headers is {dist} m!\n')
@@ -1393,7 +1572,8 @@ def outputsC(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
 
     # --- Multipath stats ---
     if config['plot_mp_errors']:
-        print(
+        
+        msg = (
             f"Mean and stdev of B1I Multipath Error in {sta1.filename}: "
             f"({round(float(sta1.MP1_mean), 2)} +/- "
             f"{round(float(sta1.MP1_std), 2)}) ns\n"
@@ -1401,14 +1581,9 @@ def outputsC(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
             f"({round(float(sta2.MP1_mean), 2)} +/- "
             f"{round(float(sta2.MP1_std), 2)}) ns\n"
         )
-        file_sum.write(
-        f"Mean and stdev of B1I Multipath Error in {sta1.filename}: "
-        f"({round(float(sta1.MP1_mean), 2)} +/- "
-        f"{round(float(sta1.MP1_std), 2)}) ns\n"
-        f"Mean and stdev of B1I Multipath Error in {sta2.filename}: "
-        f"({round(float(sta2.MP1_mean), 2)} +/- "
-        f"{round(float(sta2.MP1_std), 2)}) ns\n\n"
-        )
+        
+        print(msg)
+        file_sum.write(msg + "\n")
 
     # Convert to meters
     l7 = 299792458 / 1207.14e6
@@ -1423,15 +1598,13 @@ def outputsC(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
         'stdB2': round(pop1['C7I_corr'].std() / 0.299792458, 2),
     }
 
-    file_sum.write(
+    msg = (
     f"Median and stdev of B1I difference: ({rawdiff['medianB1']} +/- {rawdiff['stdB1']}) ns\n"
     f"Median and stdev of B2I difference: ({rawdiff['medianB2']} +/- {rawdiff['stdB2']}) ns\n"
     )
-
-    print(
-        f"Median and stdev of B1I difference: ({rawdiff['medianB1']} +/- {rawdiff['stdB1']}) ns\n"
-        f"Median and stdev of B2I difference: ({rawdiff['medianB2']} +/- {rawdiff['stdB2']}) ns\n"
-    )
+    
+    file_sum.write (msg + "\n")
+    print(msg)
 
     file_sum.close()
 
@@ -1454,7 +1627,6 @@ def outputsC(VERSION, st, nav, sta1, sta2, file_nav, dist, config, dif):
     )
 
     return rawdiff
-
 
 
 def ElevationReject(dfSTA,pos,config,name,st):
@@ -1552,7 +1724,7 @@ def ElevationReject(dfSTA,pos,config,name,st):
             ax=ax1
         )
     
-        ax1.set_title(name, fontweight='bold')
+        # ax1.set_title(name, fontweight='bold')
         ax1.set_xlabel('Elevation / degrees')
         ax1.set_ylabel('Number of satellites')
         ax1.set_xticks(bins)
@@ -1578,7 +1750,7 @@ def ElevationReject(dfSTA,pos,config,name,st):
     
         ax2.set_rlim(90, 0)
         ax2.set_rlabel_position(180)
-        ax2.set_title(f'{name} – Skyplot', fontweight='bold')
+        # ax2.set_title(f'{name} – Skyplot', fontweight='bold')
     
     
         # -------------------------
@@ -1591,7 +1763,7 @@ def ElevationReject(dfSTA,pos,config,name,st):
         
         ax3.plot(obs_per_mjd.index, obs_per_mjd.values, linewidth=1)
         
-        ax3.set_title('Observations per epoch', fontweight='bold')
+        # ax3.set_title('Observations per epoch', fontweight='bold')
         ax3.set_xlabel('MJD')
         ax3.set_ylabel('Number of observations')
         ax3.grid(alpha=0.3)
@@ -1613,16 +1785,14 @@ def ElevationReject(dfSTA,pos,config,name,st):
             alpha=0.5
         )
         
-        ax4.set_title('Elevation vs MJD', fontweight='bold')
+        # ax4.set_title('Elevation vs MJD', fontweight='bold')
         ax4.set_xlabel('MJD')
         ax4.set_ylabel('Elevation (deg)')
         ax4.set_ylim(0, 90)
         ax4.grid(alpha=0.3)
     
-    
-    
         fig.text(
-            0.98, 0.5,
+            0.98, 0.7,
             'GNSS_cal_tools\nComputed at: ' + st + ' UTC-3',
             rotation=90,
             fontweight="bold",
@@ -1649,6 +1819,154 @@ def C1P1(sta,df_sta):
     sta['c1p1_bias_median'] = c1p1_diff.median()
     sta['c1p1_bias_std'] = c1p1_diff.std()  
     return(sta)
+
+
+def OExyz1(dfnav_first, dfSTA, stafilename, config):
+    """
+    Compute satellite ECEF coordinates from broadcast ephemeris.
+    Optimized, vectorized, and numerically robust version.
+    """
+
+    # ------------------------------------------------------------------
+    # 1) Copy inputs (avoid side effects)
+    # ------------------------------------------------------------------
+    dfnav = dfnav_first.copy()
+    dfobs = dfSTA.copy()
+
+    # ------------------------------------------------------------------
+    # 2) Precompute ephemeris parameters
+    # ------------------------------------------------------------------
+    dfnav['N0'] = np.sqrt(MU) / (dfnav['sqrtA']**3)
+    dfnav['N'] = dfnav['N0'] + dfnav['DeltaN']
+
+    # ------------------------------------------------------------------
+    # 3) Merge (assumes ephemeris already filtered per epoch!) 
+    # ------------------------------------------------------------------
+    df = dfobs.merge(dfnav, on="sv", how="left")
+
+    # ------------------------------------------------------------------
+    # 4) Extract arrays (faster, cleaner)
+    # ------------------------------------------------------------------
+    sqrtA = df['sqrtA'].to_numpy()
+    e = df['Eccentricity'].to_numpy()
+    M0 = df['M0'].to_numpy()
+    N = df['N'].to_numpy()
+    Toe = df['Toe'].to_numpy()
+
+    Cus = df['Cus'].to_numpy()
+    Cuc = df['Cuc'].to_numpy()
+    Crs = df['Crs'].to_numpy()
+    Crc = df['Crc'].to_numpy()
+    Cis = df['Cis'].to_numpy()
+    Cic = df['Cic'].to_numpy()
+
+    Io = df['Io'].to_numpy()
+    IDOT = df['IDOT'].to_numpy()
+    Omega0 = df['Omega0'].to_numpy()
+    OmegaDot = df['OmegaDot'].to_numpy()
+    omega = df['omega'].to_numpy()
+
+    MJD = df['MJD'].to_numpy()
+    MJD_N = df['MJD_N'].to_numpy()
+
+    # ------------------------------------------------------------------
+    # 5) Time handling (with GPS week rollover)
+    # ------------------------------------------------------------------
+    TK = (MJD - MJD_N) * 86400.0
+    # TK = TK - np.round(TK / GPS_WEEK) * GPS_WEEK
+
+    # ------------------------------------------------------------------
+    # 6) Mean anomaly + normalization
+    # ------------------------------------------------------------------
+    MK = M0 + N * TK
+    MK = np.mod(MK, 2*np.pi)
+
+    # ------------------------------------------------------------------
+    # 7) Solve Kepler (vectorized Newton)
+    # ------------------------------------------------------------------
+    E = MK.copy()
+    for _ in range(5):  # sufficient for GNSS
+        E = E - (E - e*np.sin(E) - MK) / (1 - e*np.cos(E))
+
+    E = np.mod(E, 2*np.pi)
+
+    # ------------------------------------------------------------------
+    # 8) True anomaly (robust)
+    # ------------------------------------------------------------------
+    sinE = np.sin(E)
+    cosE = np.cos(E)
+
+    denom = 1 - e*cosE
+
+    VS = np.sqrt(1 - e**2) * sinE / denom
+    VC = (cosE - e) / denom
+
+    vk = np.arctan2(VS, VC)
+
+    # ------------------------------------------------------------------
+    # 9) Argument of latitude + corrections
+    # ------------------------------------------------------------------
+    phi = vk + omega
+
+    DUK = Cus*np.sin(2*phi) + Cuc*np.cos(2*phi)
+    DRK = Crc*np.cos(2*phi) + Crs*np.sin(2*phi)
+    DIK = Cic*np.cos(2*phi) + Cis*np.sin(2*phi)
+
+    UK = phi + DUK
+
+    A = sqrtA**2
+    RK = A*(1 - e*cosE) + DRK
+    IK = Io + DIK + IDOT*TK
+
+    # ------------------------------------------------------------------
+    # 10) Orbital plane coordinates
+    # ------------------------------------------------------------------
+    XK = RK * np.cos(UK)
+    YK = RK * np.sin(UK)
+
+    # ------------------------------------------------------------------
+    # 11) Longitude of ascending node
+    # ------------------------------------------------------------------
+    OMEGAK = (
+        Omega0
+        + (OmegaDot - OMEGAE)*TK
+        - OMEGAE*Toe
+    )
+
+    OMEGAK = np.mod(OMEGAK, 2*np.pi)
+
+    # ------------------------------------------------------------------
+    # 12) ECEF coordinates
+    # ------------------------------------------------------------------
+    cosO = np.cos(OMEGAK)
+    sinO = np.sin(OMEGAK)
+    cosI = np.cos(IK)
+    sinI = np.sin(IK)
+
+    X = XK*cosO - YK*cosI*sinO
+    Y = XK*sinO + YK*cosI*cosO
+    Z = YK*sinI
+
+    df['X'] = X
+    df['Y'] = Y
+    df['Z'] = Z
+
+    # ------------------------------------------------------------------
+    # 13) Health filtering
+    # ------------------------------------------------------------------
+    if config['SYS'] == 'C':
+        unhealthy = df['SatH1'].to_numpy() != 0
+        print(f'Unhealthy/healthy sats in {stafilename}: '
+              f'{np.count_nonzero(unhealthy)}/{np.count_nonzero(~unhealthy)}')
+        df = df[~unhealthy]
+    else:
+        unhealthy = df['health'].to_numpy() != 0
+        print(f'Unhealthy/healthy sats in {stafilename}: '
+              f'{np.count_nonzero(unhealthy)}/{np.count_nonzero(~unhealthy)}')
+        df = df[~unhealthy]
+
+    return df
+
 
 def OExyz(dfnav_first, dfSTA, stafilename,config):
     
@@ -1682,8 +2000,7 @@ def OExyz(dfnav_first, dfSTA, stafilename,config):
     
     # Compute Orbital Parameters
     # A - Semi-major axis a in meters
-    A = dfSTA['sqrtA'].to_numpy()**2 #Checked
-    #print(str(np.min(A)) + ' < A < ' + str(np.max(A)))        
+    A = dfSTA['sqrtA'].to_numpy()**2 #Checked      
 
     # Time since ephemeris reference epoch (seconds)
     # Calculate TK - Time from ephemeris reference epoch in sec
@@ -1695,6 +2012,7 @@ def OExyz(dfnav_first, dfSTA, stafilename,config):
     # se muestra en 
    # https://www.gsc-europa.eu/gsc-products/galileo-rinex-navigation-parameters
 
+
     def kepler_function(E, M, e):
         """Kepler's equation: f(E) = E - e*sin(E) - M"""
         return E - e * np.sin(E) - M
@@ -1704,8 +2022,8 @@ def OExyz(dfnav_first, dfSTA, stafilename,config):
         return 1 - e * np.cos(E)
     
     # Numerically solve Kepler's equation for each satellite
-
     result = np.zeros(dfSTA.shape[0])
+    flag = np.zeros(dfSTA.shape[0])
     for i in range(0,dfSTA.shape[0]):
         M = dfSTA['MK'][i]              # Mean anomaly in radians
         e = dfSTA['Eccentricity'][i]    # Eccentricity
@@ -1714,18 +2032,22 @@ def OExyz(dfnav_first, dfSTA, stafilename,config):
         # two steps are usually sufficient " Applied GPS for Engineers and Project Managers
 
         result[i] = E_solution[0][0]
-#        salida, info, ier, mesg = E_solution
-#        print(f"Iteraciones: {info['nfev']}")
-#        print(f"Error residual: {info['fvec'][0]:.2e}")
-#        print(f"Código de salida: {ier} - {mesg}")
+        flag[i] = E_solution[2]
+        # salida, info, ier, mesg = E_solution
+        # if ier != 1:
+            # print(f"Iteraciones: {info['nfev']}")
+            # print(f"Error residual: {info['fvec'][0]:.2e}")
+            # print(f"Código de salida: {ier} - {mesg}")
 
+    #result = np.mod(result, 2*np.pi)
     dfSTA['EK'] = result
-    
+    dfSTA['Kepler_flag'] = flag
     # Calculo de la true anomaly, vk. 
     # La 'EK' es eccentricity anomaly que sale de resolver numericamente 
     # la ecuación de Kepler.
 
     ec = dfSTA['Eccentricity'].to_numpy()
+    
     ek = dfSTA['EK'].to_numpy()    
     cosek = np.cos(ek)
     denom = 1-ec*cosek
@@ -1786,8 +2108,7 @@ def OExyz(dfnav_first, dfSTA, stafilename,config):
     dfSTA['Y'] = Y
     dfSTA['Z'] = Z
     
-    
-    # Remove unhealthy satellites
+    # Remove unhealthy satellite
     if config['SYS'] == 'C':
         unhealthy_count = sum(dfSTA['SatH1'] != 0)
         healthy_count = sum(dfSTA['SatH1'] == 0)
@@ -1841,9 +2162,6 @@ def dfNAVgen(nav,config):
         healthy_count = sum(dfnav['health'] == 0)
         dfnav = dfnav[dfnav['health'] == 0]
         print(f'Unhealthy/healthy sats in {nav.filename}: {unhealthy_count}/{healthy_count}')
-
-    #Remove satellites with clock drift bigger than 1e-11
-    #dfnav = dfnav[dfnav['SVclockDrift'].abs() < 1e-11]
 
     
     #Adding MJD columns

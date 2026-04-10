@@ -1,0 +1,29 @@
+ GNSS_cal_tools Version: 2/1/25
+Processing date and time: 2026-04-10 15:01:09 UTC-3
+Output interval (s) = 300
+Code threshold (ns) = 20
+Residual threshold (m) = 0.05
+Processed system: G. (GPS:G, Galileo:R, Glonass:R, Beidu:C)
+Min Elevation (deg): 10
+
+INPUT FILES
+ BRDC00IGS_R_20242350000_01D_MN.rnx	RINEX version: 3.04
+ AGGO2350.24O	RINEX version: 3.05
+ SIMr2350.24O	RINEX version: 3.04
+
+Distance from headers is 10.32 m
+Interval of AGGO2350.24O is 30.0 s
+Interval of SIMr2350.24O is 30.0 s
+
+
+Median and stdev of C1P1 bias in AGGO2350.24O: (1.35 +/- 1.09) ns
+Median and stdev of C1P1 bias in SIMr2350.24O: (1.68 +/- 1.08) ns
+
+
+Median and stdev of L1 Multipath Error in AGGO2350.24O: (-0.06 +/- 1.27) ns
+Median and stdev of L1 Multipath Error in SIMr2350.24O: (0.00 +/- 1.38) ns
+
+Median and stdev of C1 difference: (-109.61 +/- 0.27) ns
+Median and stdev of P1 difference: (-109.3 +/- 0.27) ns
+Median and stdev of P2 difference: (-108.72 +/- 0.35) ns
+
